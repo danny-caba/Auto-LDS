@@ -560,6 +560,37 @@ def filas_reales(tabla_locator):
     return tabla_locator.locator("tbody tr:not(.ant-table-measure-now)").filter(has_not_text="No hay datos")
 
 
+def click_cuando_habilitado(app, boton, timeout_ms=60000):
+    """Espera activamente a que un boton quede habilitado antes de
+    clickear - CONFIRMADO EN VIVO 26/10/2026 (RF-7, "Nuevo rango"):
+    tras confirmar Modificar/Ingresar, el boton puede quedar
+    deshabilitado por mas de 20s de forma intermitente y en un punto
+    DISTINTO cada vez (1ra vez tras el 1er rango, otra vez tras el 2do) -
+    coincide con el patron ya documentado en este mismo proyecto de
+    "servidor con sobrecarga transitoria" (ver RF-3 en la memoria del
+    proyecto), no un problema de selector. Se da bastante margen (60s)
+    en vez de pelear contra la latencia real del backend."""
+    plazo = time.monotonic() + timeout_ms / 1000
+    while time.monotonic() < plazo:
+        if boton.is_enabled():
+            boton.click()
+            return
+        app.wait_for_timeout(500)
+    boton.click(timeout=5000)
+
+
+def seleccionar_tipo_corte(frame, app, texto):
+    """Combo nz-select (#tipoCorte) de RF-7 - confirmado en vivo
+    26/10/2026: abrir con click, elegir la opcion por texto dentro del
+    panel ".ant-select-item-option" (dentro del MISMO frame, el overlay
+    de ng-zorro se adjunta al documento del iframe, no al de la pagina
+    padre)."""
+    frame.locator("#tipoCorte").click()
+    app.wait_for_timeout(500)
+    frame.locator(".ant-select-item-option").filter(has_text=texto).first.click()
+    app.wait_for_timeout(300)
+
+
 
 _EMU_POR_PULGADA = 914400
 _ANCHO_MAX_PULGADAS = 6.3

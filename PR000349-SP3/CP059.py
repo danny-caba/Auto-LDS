@@ -560,6 +560,37 @@ def filas_reales(tabla_locator):
     return tabla_locator.locator("tbody tr:not(.ant-table-measure-now)").filter(has_not_text="No hay datos")
 
 
+def click_cuando_habilitado(app, boton, timeout_ms=60000):
+    """Espera activamente a que un boton quede habilitado antes de
+    clickear - CONFIRMADO EN VIVO 26/10/2026 (RF-7, "Nuevo rango"):
+    tras confirmar Modificar/Ingresar, el boton puede quedar
+    deshabilitado por mas de 20s de forma intermitente y en un punto
+    DISTINTO cada vez (1ra vez tras el 1er rango, otra vez tras el 2do) -
+    coincide con el patron ya documentado en este mismo proyecto de
+    "servidor con sobrecarga transitoria" (ver RF-3 en la memoria del
+    proyecto), no un problema de selector. Se da bastante margen (60s)
+    en vez de pelear contra la latencia real del backend."""
+    plazo = time.monotonic() + timeout_ms / 1000
+    while time.monotonic() < plazo:
+        if boton.is_enabled():
+            boton.click()
+            return
+        app.wait_for_timeout(500)
+    boton.click(timeout=5000)
+
+
+def seleccionar_tipo_corte(frame, app, texto):
+    """Combo nz-select (#tipoCorte) de RF-7 - confirmado en vivo
+    26/10/2026: abrir con click, elegir la opcion por texto dentro del
+    panel ".ant-select-item-option" (dentro del MISMO frame, el overlay
+    de ng-zorro se adjunta al documento del iframe, no al de la pagina
+    padre)."""
+    frame.locator("#tipoCorte").click()
+    app.wait_for_timeout(500)
+    frame.locator(".ant-select-item-option").filter(has_text=texto).first.click()
+    app.wait_for_timeout(300)
+
+
 
 _EMU_POR_PULGADA = 914400
 _ANCHO_MAX_PULGADAS = 6.3
@@ -772,7 +803,95 @@ def main():
         _CASO_OK = False
         try:
             login(page, paso_excel=1)
-            raise NotImplementedError('CP059 (RF-7 - Guardado exitoso de la configuración de rangos): falta escribir el body real - falta exploracion en vivo.')
+            app, frame = abrir_rf07(page, paso_excel=1)
+            app.wait_for_timeout(1500)
+            tabla = frame.locator("nz-table, table").first
+            filas_reales(tabla).first.wait_for(state="visible", timeout=8000)
+
+            # Paso 1: dejar un conjunto CONTIGUO, iniciado en 0, hasta el tope:
+            # 0.00-150.00 FUSIBLE/CABLE, 150.00-250.00 ALTA TENSION,
+            # 250.00-999999999.00 MEDIA TENSION (datos exactos de la matriz).
+            fila = filas_reales(tabla).first
+            fila.click()
+            app.wait_for_timeout(800)
+            campo_pf = frame.locator("#potenciaFinal")
+            campo_pf.click()
+            campo_pf.fill("")
+            campo_pf.fill("150.00")
+            seleccionar_tipo_corte(frame, app, "FUSIBLE/CABLE")
+            frame.locator("button:has-text('Modificar')").first.click()
+            app.wait_for_timeout(1000)
+            cerrar_modal_confirmacion(frame, aceptar=True, timeout_ms=4000)
+            app.wait_for_timeout(800)
+            capturar_paso(app, "rango1_fusible_cable_0_150", paso_excel=1)
+
+            click_cuando_habilitado(app, frame.locator("button:has-text('Nuevo rango')").first)
+            app.wait_for_timeout(800)
+            frame.locator("#potenciaInicial").click()
+            frame.locator("#potenciaInicial").fill("150.00")
+            frame.locator("#potenciaFinal").click()
+            frame.locator("#potenciaFinal").fill("250.00")
+            seleccionar_tipo_corte(frame, app, "ALTA TENSION")
+            frame.locator("button:has-text('Ingresar')").first.click()
+            app.wait_for_timeout(1000)
+            cerrar_modal_confirmacion(frame, aceptar=True, timeout_ms=4000)
+            app.wait_for_timeout(800)
+            capturar_paso(app, "rango2_alta_tension_150_250", paso_excel=1)
+
+            # CONFIRMADO EN VIVO 26/10/2026: tras "Ingresar" el formulario queda
+            # LISTO para el siguiente rango nuevo (campos vacios, "Ingresar" ya
+            # habilitado) - NO hace falta volver a pulsar "Nuevo rango" (de hecho
+            # queda deshabilitado a proposito en este estado, su title lo confirma:
+            # "Limpiar la seleccion y volver a la posicion de nuevo registro" - ya
+            # esta ahi). Pulsarlo de nuevo sin necesidad causaba el FALLO real (30s+
+            # de espera por "element is not enabled").
+            frame.locator("#potenciaInicial").click()
+            frame.locator("#potenciaInicial").fill("250.00")
+            frame.locator("#potenciaFinal").click()
+            frame.locator("#potenciaFinal").fill("999999999.00")
+            seleccionar_tipo_corte(frame, app, "MEDIA TENSION")
+            frame.locator("button:has-text('Ingresar')").first.click()
+            app.wait_for_timeout(1000)
+            cerrar_modal_confirmacion(frame, aceptar=True, timeout_ms=4000)
+            app.wait_for_timeout(800)
+            capturar_paso(app, "rango3_media_tension_250_tope", paso_excel=1)
+
+            texto_lista = tabla.inner_text()
+            for fragmento in ["150.00", "250.00", "FUSIBLE/CABLE", "ALTA TENSION", "MEDIA TENSION"]:
+                assert fragmento in texto_lista, f"Se esperaba ver {fragmento!r} en la lista antes de Actualizar: {texto_lista!r}"
+
+            # Paso 2-3: Actualizar + confirmacion final.
+            frame.locator("button:has-text('Actualizar')").first.click()
+            app.wait_for_timeout(1200)
+            mensaje_confirmacion = cerrar_modal_confirmacion(frame, aceptar=True, timeout_ms=4000)
+            app.wait_for_timeout(1500)
+            mensaje_resultado = cerrar_modal_confirmacion(frame, aceptar=True, timeout_ms=6000)
+            capturar_paso(app, "resultado_actualizacion", paso_excel=4)
+
+            # Paso 4: verificar el mensaje de exito (NO un mensaje de inconsistencia
+            # como los de CP058/CP056).
+            mensajes = " | ".join(m for m in [mensaje_confirmacion, mensaje_resultado] if m)
+            assert mensajes, "Se esperaba al menos un mensaje tras Actualizar"
+            assert not re.search(r"inconsist|debe (iniciar|comenzar|llegar)|hueco|duplicad", mensajes, re.I), (
+                f"No se esperaba un mensaje de inconsistencia con un conjunto de rangos integro: {mensajes!r}"
+            )
+            assert re.search(r"exit|correct|actualiz|guard", mensajes, re.I), (
+                f"Se esperaba un mensaje de exito tras actualizar: {mensajes!r}"
+            )
+
+            # Paso 5: reabrir la pantalla y verificar que la nueva configuracion
+            # quedo persistida de verdad (no solo en memoria).
+            app.reload()
+            app.wait_for_load_state("networkidle")
+            frame = app.locator("#aplicacion").content_frame
+            tabla2 = frame.locator("nz-table, table").first
+            filas_reales(tabla2).first.wait_for(state="visible", timeout=10000)
+            texto_tras_recargar = tabla2.inner_text()
+            capturar_paso(app, "configuracion_persistida_tras_recargar", paso_excel=5)
+            for fragmento in ["150.00", "250.00", "FUSIBLE/CABLE", "ALTA TENSION", "MEDIA TENSION"]:
+                assert fragmento in texto_tras_recargar, (
+                    f"Se esperaba ver {fragmento!r} persistido tras recargar la pantalla: {texto_tras_recargar!r}"
+                )
 
             capturar_paso(app, "estado_final_del_caso", paso_excel=max(_parsear_pasos_excel(PASOS_CASO), default=None))
             _CASO_OK = True

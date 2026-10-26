@@ -560,6 +560,37 @@ def filas_reales(tabla_locator):
     return tabla_locator.locator("tbody tr:not(.ant-table-measure-now)").filter(has_not_text="No hay datos")
 
 
+def click_cuando_habilitado(app, boton, timeout_ms=60000):
+    """Espera activamente a que un boton quede habilitado antes de
+    clickear - CONFIRMADO EN VIVO 26/10/2026 (RF-7, "Nuevo rango"):
+    tras confirmar Modificar/Ingresar, el boton puede quedar
+    deshabilitado por mas de 20s de forma intermitente y en un punto
+    DISTINTO cada vez (1ra vez tras el 1er rango, otra vez tras el 2do) -
+    coincide con el patron ya documentado en este mismo proyecto de
+    "servidor con sobrecarga transitoria" (ver RF-3 en la memoria del
+    proyecto), no un problema de selector. Se da bastante margen (60s)
+    en vez de pelear contra la latencia real del backend."""
+    plazo = time.monotonic() + timeout_ms / 1000
+    while time.monotonic() < plazo:
+        if boton.is_enabled():
+            boton.click()
+            return
+        app.wait_for_timeout(500)
+    boton.click(timeout=5000)
+
+
+def seleccionar_tipo_corte(frame, app, texto):
+    """Combo nz-select (#tipoCorte) de RF-7 - confirmado en vivo
+    26/10/2026: abrir con click, elegir la opcion por texto dentro del
+    panel ".ant-select-item-option" (dentro del MISMO frame, el overlay
+    de ng-zorro se adjunta al documento del iframe, no al de la pagina
+    padre)."""
+    frame.locator("#tipoCorte").click()
+    app.wait_for_timeout(500)
+    frame.locator(".ant-select-item-option").filter(has_text=texto).first.click()
+    app.wait_for_timeout(300)
+
+
 
 _EMU_POR_PULGADA = 914400
 _ANCHO_MAX_PULGADAS = 6.3
@@ -772,7 +803,56 @@ def main():
         _CASO_OK = False
         try:
             login(page, paso_excel=1)
-            raise NotImplementedError('CP060 (RF-7 - Advertencia al Actualizar con la lista de rangos vacía): falta escribir el body real - falta exploracion en vivo.')
+            app, frame = abrir_rf07(page, paso_excel=1)
+            app.wait_for_timeout(1500)
+            tabla = frame.locator("nz-table, table").first
+            filas_reales(tabla).first.wait_for(state="visible", timeout=8000)
+
+            # Paso 1: eliminar todos los rangos existentes, uno por uno, confirmando
+            # cada eliminacion.
+            while filas_reales(tabla).count() > 0:
+                fila = filas_reales(tabla).first
+                fila.click()
+                app.wait_for_timeout(600)
+                boton_eliminar = frame.locator("button:has-text('Eliminar')").first
+                assert boton_eliminar.is_enabled(timeout=5000), "Eliminar deberia estar habilitado con un rango seleccionado"
+                boton_eliminar.click()
+                app.wait_for_timeout(1000)
+                mensaje_el = cerrar_modal_confirmacion(frame, aceptar=True, timeout_ms=4000)
+                assert mensaje_el is not None and "seguro" in mensaje_el.lower(), f"Se esperaba la confirmacion de Eliminar: {mensaje_el!r}"
+                app.wait_for_timeout(600)
+            capturar_paso(app, "lista_vacia_en_memoria", paso_excel=1)
+            assert filas_reales(tabla).count() == 0, "La lista deberia quedar vacia tras eliminar todos los rangos"
+
+            # Paso 2-3: Actualizar con la lista vacia -> advertencia especial de
+            # "la sucursal quedara sin rangos", distinta de la confirmacion generica
+            # de Eliminar.
+            frame.locator("button:has-text('Actualizar')").first.click()
+            app.wait_for_timeout(1200)
+            dialogo = obtener_modal_visible(frame, timeout_ms=5000)
+            assert dialogo is not None, "Se esperaba la advertencia de lista vacia al presionar Actualizar"
+            mensaje_advertencia = dialogo.inner_text()
+            capturar_paso(app, "advertencia_lista_vacia", paso_excel=3)
+            assert "sin rangos" in mensaje_advertencia.lower() or "quedara sin" in mensaje_advertencia.lower() or "quedar\u00e1 sin" in mensaje_advertencia.lower(), (
+                f"Se esperaba la advertencia especifica de sucursal sin rangos configurados: {mensaje_advertencia!r}"
+            )
+
+            # Paso 4: CANCELAR (no Aceptar) - evita dejar la sucursal real sin
+            # ninguna configuracion. El objetivo del caso es verificar que la
+            # advertencia aparece, no completar el guardado vacio.
+            dialogo.get_by_role("button", name=re.compile(r"^\s*Cancelar\s*$", re.I)).click()
+            app.wait_for_timeout(1000)
+            capturar_paso(app, "cancelado_tras_advertencia", paso_excel=4)
+
+            # Verificar que la configuracion real NO quedo vacia: recargar y
+            # confirmar que sigue habiendo al menos 1 rango persistido.
+            app.reload()
+            app.wait_for_load_state("networkidle")
+            frame = app.locator("#aplicacion").content_frame
+            tabla2 = frame.locator("nz-table, table").first
+            filas_reales(tabla2).first.wait_for(state="visible", timeout=10000)
+            capturar_paso(app, "configuracion_real_intacta_tras_cancelar", paso_excel=4)
+            assert filas_reales(tabla2).count() >= 1, "Cancelar no deberia haber dejado la sucursal real sin rangos configurados"
 
             capturar_paso(app, "estado_final_del_caso", paso_excel=max(_parsear_pasos_excel(PASOS_CASO), default=None))
             _CASO_OK = True
