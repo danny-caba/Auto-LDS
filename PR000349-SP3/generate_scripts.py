@@ -477,6 +477,47 @@ assert modal_creacion.is_visible(), "El modal de Creacion de Area no deberia cer
 capturar_paso(app, "modal_sigue_abierto_sin_crear", paso_excel=4)
 '''
 
+# CP006: re-evaluado 26/10/2026 a partir del manual de usuario
+# (RF-1-manual_usuario_areas_zonales.pdf, seccion 3.4) - lo documentado
+# antes ("condicion de carrera dificil de forzar") era un malentendido
+# del flujo real. El boton + ("Crear nueva area", title/aria-label
+# exactos) se habilita con SOLO escribir un codigo (exista o no, tabla
+# de la seccion 3.2 del manual) - NO hace falta pasar por Leer -> "no
+# existe, desea crearla?" (ese camino solo aplica a codigos QUE NO
+# EXISTEN). Alcanzar la ventana de Creacion de Area con un codigo YA
+# EXISTENTE es 100% directo: escribir el codigo existente y clickear +
+# directamente. Confirmado en vivo 26/10/2026: mensaje real "El area ya
+# existe" (el manual lo cita con tilde, "El área ya existe.").
+CUERPOS_REALES["CP006"] = '''
+app, frame = abrir_rf01(page, paso_excel=1)
+campo_codigo = frame.locator("#codigoArea")
+campo_codigo.click()
+campo_codigo.fill("11")  # area ya existente (ver CP002)
+app.wait_for_timeout(500)
+capturar_paso(app, "codigo_existente_escrito", paso_excel=1)
+
+boton_mas = frame.get_by_role("button", name="Crear nueva área")
+assert boton_mas.is_enabled(timeout=5000), "El boton + deberia habilitarse con un codigo escrito"
+boton_mas.click()
+app.wait_for_timeout(1000)
+
+modal_creacion = obtener_modal_visible(frame, timeout_ms=4000)
+assert modal_creacion is not None and "creación de área" in modal_creacion.inner_text().lower(), (
+    "Se esperaba que se abra el modal de Creacion de Area con el codigo existente precargado"
+)
+campo_desc = modal_creacion.locator("input, textarea").last
+campo_desc.click()
+campo_desc.fill("Prueba CP006 - codigo ya existente")
+app.wait_for_timeout(300)
+capturar_paso(app, "modal_creacion_con_codigo_existente", paso_excel=2)
+
+modal_creacion.get_by_role("button", name=re.compile(r"^\\s*Crear Área\\s*$", re.I)).click()
+app.wait_for_timeout(1200)
+resultado = modal_creacion.inner_text() if modal_creacion.is_visible() else obtener_modal_visible(frame, timeout_ms=4000).inner_text()
+capturar_paso(app, "mensaje_area_ya_existe", paso_excel=3)
+assert "ya existe" in resultado.lower(), f"Se esperaba el mensaje de area ya existente: {resultado!r}"
+'''
+
 # RF-1: CP007/CP008/CP009 - la matriz sugiere Sector "11"/Zona "100"/"107"
 # pero en este ambiente esos valores YA NO sirven (el area 11 real tiene
 # 110 combinaciones que agotan el catalogo de Zona para su Sector, y
