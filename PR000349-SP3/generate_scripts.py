@@ -390,6 +390,68 @@ assert boton_actualizar.is_enabled(timeout=8000), "Actualizar deberia habilitars
 capturar_paso(app, "modo_edicion_habilitado", paso_excel=3)
 '''
 
+# CP003: confirmado en vivo 26/10/2026 con el permiso de lectura
+# retirado para este recurso. El sistema SI deniega el acceso
+# correctamente (no carga la grilla, no entra a modo edicion) - pero lo
+# hace con un defecto de implementacion: la peticion real
+# ObtenerCargaInicial responde HTTP 400 Bad Request (no 401/403, los
+# codigos semanticamente correctos para "sin permiso") con cuerpo
+# {"statusCode":400,"mensaje":"Acceso denegado al recurso.",
+# "detalle":"Acceso denegado al recurso."} - el mensaje en si es
+# correcto, pero el codigo de estado no. Ademas el frontend NI SIQUIERA
+# muestra ese mensaje especifico al usuario: lo tapa con el generico
+# "Error de Servicio / Error al cargar las Areas Zonales y los
+# Sectores.". DEFECTO REAL confirmado (decision del usuario 26/10/2026):
+# reportar el uso de HTTP 400 en vez de 401/403 para un caso de
+# denegacion de acceso.
+CUERPOS_REALES["CP003"] = '''
+# CONFIRMADO EN VIVO 26/10/2026: sin permiso de lectura, ObtenerCargaInicial
+# (que carga las Areas Y los Sectores) falla DESDE LA APERTURA de la
+# pantalla - no hace falta escribir un codigo ni presionar Leer para
+# reproducirlo. El formulario (Codigo de Area, Descripcion de Area,
+# Sector, Zona) NO llega a renderizarse en este estado: la pantalla
+# muestra directo el banner "No se pudieron cargar las Areas Zonales ni
+# los Sectores." + un dialogo "Error de Servicio". Registrado sobre
+# `context` (no `page`) ANTES de abrir la pantalla porque la peticion
+# ocurre en el popup, una pagina nueva dentro del mismo contexto.
+respuestas_acceso_denegado = []
+def _capturar_acceso_denegado(resp):
+    if "ObtenerCargaInicial" in resp.url:
+        try:
+            cuerpo = resp.text()
+        except Exception:
+            cuerpo = ""
+        respuestas_acceso_denegado.append((resp.status, cuerpo))
+context.on("response", _capturar_acceso_denegado)
+
+app, frame = abrir_rf01(page, paso_excel=1)
+app.wait_for_timeout(1500)
+capturar_paso(app, "pantalla_sin_permiso_de_lectura", paso_excel=2)
+
+texto_pantalla = frame.locator("body").inner_text()
+assert "no se pudieron cargar" in texto_pantalla.lower(), (
+    f"Se esperaba el aviso de carga fallida (acceso denegado): {texto_pantalla!r}"
+)
+assert frame.locator("#codigoArea").count() == 0, (
+    "El formulario no deberia renderizarse mientras la carga inicial esta denegada"
+)
+
+assert len(respuestas_acceso_denegado) > 0, "Se esperaba ver la peticion ObtenerCargaInicial"
+status_real, cuerpo_real = respuestas_acceso_denegado[-1]
+capturar_paso(app, "defecto_http_400_en_vez_de_401_403", paso_excel=4)
+
+# DEFECTO REAL: el backend deniega el acceso (correcto) pero con HTTP
+# 400 en vez de 401/403 (codigos semanticamente correctos para esto).
+assert status_real == 400, f"Comportamiento real observado: HTTP {status_real} (se documenta el defecto si es 400, revisar si cambio)"
+assert "acceso denegado" in cuerpo_real.lower(), f"Se esperaba el mensaje real 'Acceso denegado al recurso.' en el cuerpo: {cuerpo_real!r}"
+raise AssertionError(
+    f"DEFECTO REAL CONFIRMADO: el acceso SI se deniega correctamente (grilla vacia, no entra a modo edicion), "
+    f"pero el backend usa HTTP {status_real} Bad Request en vez de 401/403 para un caso de falta de permiso "
+    f"(cuerpo real: {cuerpo_real!r}). Ademas el frontend no muestra este mensaje especifico, solo un "
+    f"'Error de Servicio' generico. Reportar a Desarrollo: usar 401 Unauthorized o 403 Forbidden, no 400."
+)
+'''
+
 CUERPOS_REALES["CP004"] = '''
 app, frame = abrir_rf01(page, paso_excel=1)
 campo_codigo = frame.locator("#codigoArea")
