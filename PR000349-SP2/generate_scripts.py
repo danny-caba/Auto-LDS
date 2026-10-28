@@ -30,6 +30,10 @@ sys.path.insert(0, str(FRAMEWORK_DIR))
 sys.path.insert(0, str(FRAMEWORK_DIR / "modulos"))
 import web_lds_core as core  # noqa: E402
 import consulta_clientes_ss as modulo_rf01  # noqa: E402
+import mantenimiento_orden_conexion as modulo_rf02  # noqa: E402
+import consulta_cortes_reconexiones as modulo_rf03  # noqa: E402
+import consulta_pagos as modulo_rf05  # noqa: E402
+import consulta_solicitudes_reposicion_pendientes as modulo_rf08  # noqa: E402
 import consulta_cuadratura_sesion as modulo_rf04  # noqa: E402
 import mantenedor_inspectores_corte as modulo_rf06  # noqa: E402
 import consulta_cortes_pendientes as modulo_rf07  # noqa: E402
@@ -79,7 +83,7 @@ def fuente_modulo(modulo, saltar=("PWTimeoutError",)):
 
 HELPERS_MODULOS = "\n\n\n".join(
     fuente_modulo(m) for m in (
-        modulo_rf01, modulo_rf04, modulo_rf06, modulo_rf07, modulo_rf09,
+        modulo_rf01, modulo_rf02, modulo_rf03, modulo_rf04, modulo_rf05, modulo_rf06, modulo_rf07, modulo_rf08, modulo_rf09,
     )
 )
 
@@ -141,7 +145,7 @@ def main():
         app = None
         _CASO_OK = False
         try:
-            login(page, paso_excel=1)
+            login(page)
 {body}
 
             capturar_paso(app, "estado_final_del_caso", paso_excel=max(_parsear_pasos_excel(PASOS_CASO), default=None))
@@ -161,7 +165,7 @@ def main():
                 ruta_portal = _renombrar_video(video_portal, EVIDENCIA / f"{{CASO}}-1.webm") if video_portal is not None else None
                 ruta_app = _renombrar_video(video_app, EVIDENCIA / f"{{CASO}}-2.webm") if video_app is not None else None
                 rutas_videos = [r for r in (ruta_portal, ruta_app) if r is not None]
-                rutas_videos.extend(p for p in sorted(EVIDENCIA.glob("page@*.webm")) if p not in rutas_videos)
+                rutas_videos.extend(sorted(EVIDENCIA.glob("page@*.webm")))
                 if len(rutas_videos) > 1:
                     _unir_videos(EVIDENCIA / f"{{CASO}}_video.webm", *rutas_videos)
                 elif len(rutas_videos) == 1:
@@ -368,6 +372,54 @@ CUERPOS_REALES["CP008"] = f'''
 raise NotImplementedError("CP008 (RF-01 - Generar y descargar informe exitoso): {_MOTIVO_BLOQUEO_CP008}")
 '''
 
+# RF-02 "Mantenimiento de Ordenes de Conexion" (CP009-CP016, CP072) -
+# RE-VERIFICADO EN VIVO 28/10/2026: el backend ya NO esta caido (el 503
+# documentado el 28/09/2026 no se reproduce un mes despues, misma
+# cuenta) - ver ficha tecnica completa en
+# _framework/modulos/mantenimiento_orden_conexion.py.
+#
+# CP010 confirmado con dato real: cliente 264241 (ya usado en otros
+# proyectos de este framework), sin orden de conexion - mensaje real
+# EXACTO: "No se encontró Orden de Conexión del Cliente."
+#
+# CP009/CP011/CP012-016/CP072 QUEDAN BLOQUEADOS (28/10/2026): escaneados
+# ~25 clientes ya conocidos del proyecto - ninguno tiene una orden
+# CREADA por la cuenta de prueba (CP009 lo exige) ni una orden YA
+# ANULADA (CP011). La propia matriz Excel ya trae una nota de
+# Desarrollo confirmando que esto es un problema de dato conocido, no
+# de automatizacion: "no se encontró dato real que la satisfaga;
+# nucli.rol_creacion nunca coincide". CP012-016 dependen de ser
+# creador o de un rol privilegiado (JEFESUCU, CP072) sobre una orden
+# real - mismo bloqueo de raiz. Pendiente: conseguir estos datos via
+# Desarrollo/BD o que el usuario indique un cliente real valido.
+
+_MOTIVO_BLOQUEO_RF02_DATO = (
+    "falta un cliente real con una orden de conexion en el estado que este caso necesita "
+    "(creada por la propia cuenta de prueba, o ya anulada) - escaneados ~25 clientes "
+    "conocidos del proyecto el 28/10/2026, ninguno califica. La propia matriz ya documenta "
+    "que Desarrollo tampoco encontro un dato real para la precondicion de creador "
+    "(nucli.rol_creacion nunca coincide). Ver _framework/modulos/mantenimiento_orden_conexion.py."
+)
+
+CUERPOS_REALES["CP009"] = f'''
+raise NotImplementedError("CP009 (RF-02 - Leer exitoso, usuario creador de la orden): {_MOTIVO_BLOQUEO_RF02_DATO}")
+'''
+
+CUERPOS_REALES["CP010"] = '''
+app, frame = abrir_mantord(page, paso_excel=1)
+capturar_paso(app, "pantalla_inicial", paso_excel=2)
+
+mensaje = leer_orden(app, frame, "264241")
+capturar_paso(app, "resultado_sin_orden", paso_excel=3)
+assert mensaje is not None and "no se encontr" in mensaje.lower() and "orden de conexi" in mensaje.lower(), (
+    f"Se esperaba el mensaje de orden no encontrada: {mensaje!r}"
+)
+'''
+
+CUERPOS_REALES["CP011"] = f'''
+raise NotImplementedError("CP011 (RF-02 - Leer, orden ya anulada): {_MOTIVO_BLOQUEO_RF02_DATO}")
+'''
+
 # RF-04 "Consulta de Cuadratura de Sesion" (CP025-CP030) - bodies reales,
 # confirmados en vivo el 28/09/2026 con DCABA_DW (ver
 # _exploracion/explore_36..40_rf04_*.py). Oficina 0010 (Chacarilla) +
@@ -376,6 +428,78 @@ raise NotImplementedError("CP008 (RF-01 - Generar y descargar informe exitoso): 
 # historico, no del dia de hoy). Todas las validaciones/RN confirmadas
 # tal cual el EF. Ver ficha tecnica completa en
 # _framework/modulos/consulta_cuadratura_sesion.py.
+
+# RF-03 "Consulta de Cortes y Reconexiones" (CP017-CP024) -
+# RE-VERIFICADO EN VIVO 28/10/2026: el backend ya NO esta caido (el 504
+# documentado el 28/09/2026 no se reproduce un mes despues, misma
+# cuenta DCABA_DW) - ver ficha tecnica completa en
+# _framework/modulos/consulta_cortes_reconexiones.py.
+#
+# CP023 confirmado con dato real: operador de fecha "entre" (default)
+# con ambas fechas puestas pero sin otro filtro -> dialogo de
+# confirmacion real EXACTO: "No ha seleccionado ningún filtro, se
+# mostrarán todos los datos entre las fechas seleccionadas. ¿Desea
+# continuar?" - mismo patron que RF-04/RF-05.
+#
+# CP017-022/024 QUEDAN PENDIENTES (28/10/2026): backend confirmado
+# operativo, falta terminar la exploracion en vivo de cada validacion
+# puntual (radio Tipo de Corte, motivo de Procesos, limite de 15 dias,
+# exportacion) - no alcanzo el tiempo en esta sesion.
+
+_MOTIVO_PENDIENTE_RF03 = (
+    "backend confirmado operativo el 28/10/2026 (ya no da 504) - falta terminar la "
+    "exploracion en vivo de esta validacion puntual. Ver "
+    "_framework/modulos/consulta_cortes_reconexiones.py."
+)
+
+CUERPOS_REALES["CP017"] = f'''
+raise NotImplementedError("CP017 (RF-03 - Busqueda exitosa, Tipo de Corte por defecto): {_MOTIVO_PENDIENTE_RF03}")
+'''
+CUERPOS_REALES["CP018"] = f'''
+raise NotImplementedError("CP018 (RF-03 - Cambio a Tipo de Corte Verificaciones): {_MOTIVO_PENDIENTE_RF03}")
+'''
+CUERPOS_REALES["CP019"] = f'''
+raise NotImplementedError("CP019 (RF-03 - Validacion de rango de fecha incompleto): {_MOTIVO_PENDIENTE_RF03}")
+'''
+CUERPOS_REALES["CP020"] = f'''
+raise NotImplementedError("CP020 (RF-03 - Validacion de fecha calendario invalida): {_MOTIVO_PENDIENTE_RF03}")
+'''
+CUERPOS_REALES["CP021"] = f'''
+raise NotImplementedError("CP021 (RF-03 - Fecha obligatoria al elegir el primer motivo de Procesos): {_MOTIVO_PENDIENTE_RF03}")
+'''
+CUERPOS_REALES["CP022"] = f'''
+raise NotImplementedError("CP022 (RF-03 - Limite de 15 dias activado al elegir un motivo): {_MOTIVO_PENDIENTE_RF03}")
+'''
+
+CUERPOS_REALES["CP023"] = '''
+app, frame = abrir_cortes_reconexiones(page, paso_excel=1)
+operador_default = frame.locator("#fldTipoFiltroFecha").input_value()
+assert operador_default == "entre", f"Se esperaba 'entre' como operador de fecha por defecto: {operador_default!r}"
+capturar_paso(app, "operador_fecha_por_defecto", paso_excel=2)
+
+fechas = frame.locator("input[type=date]")
+fechas.nth(0).fill("2026-01-01")
+fechas.nth(1).fill("2026-12-31")
+capturar_paso(app, "fechas_sin_otro_filtro", paso_excel=3)
+
+tipo, mensaje = leer_cortes_reconexiones(app, frame, aceptar_confirmacion=False)
+assert tipo == "confirmacion", f"Se esperaba el dialogo de confirmacion por falta de filtros: tipo={tipo!r} mensaje={mensaje!r}"
+capturar_paso(app, "confirmacion_sin_filtros", paso_excel=4)
+assert "no ha seleccionado ning" in mensaje.lower() and "desea continuar" in mensaje.lower(), (
+    f"No se vio el mensaje de confirmacion esperado: {mensaje!r}"
+)
+
+modal = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile(".", re.S))
+modal.first.get_by_role("button", name=re.compile("Aceptar", re.I)).click()
+app.wait_for_timeout(3000)
+texto_resultado = frame.locator("body").inner_text()
+capturar_paso(app, "consulta_ejecutada_sin_error", paso_excel=5)
+assert "error" not in texto_resultado.lower(), f"No se esperaba un error tras confirmar: {texto_resultado[-300:]!r}"
+'''
+
+CUERPOS_REALES["CP024"] = f'''
+raise NotImplementedError("CP024 (RF-03 - Guardar exporta con Tipo fijo, comportamiento heredado): {_MOTIVO_PENDIENTE_RF03}")
+'''
 
 CUERPOS_REALES["CP025"] = '''
 app, frame = abrir_consulta_cuadratura_sesion(page, paso_excel=1)
@@ -546,6 +670,83 @@ capturar_paso(app, "verificacion_reconsulta_completa", paso_excel=5)
 # datos con inactivos, u operaciones de ESCRITURA real sobre Pruebas)
 # quedan documentados como pendientes - ver ficha tecnica de
 # _framework/modulos/mantenedor_inspectores_corte.py.
+
+# RF-05 "Consulta de Pagos" (CP031-CP037) - RE-VERIFICADO EN VIVO
+# 28/10/2026: el backend ya NO esta caido (el 503 documentado el
+# 28/09/2026 no se reproduce un mes despues, misma cuenta DCABA_DW) -
+# ver ficha tecnica completa en _framework/modulos/consulta_pagos.py.
+#
+# CP036 confirmado con dato real: Referencia "Actualizacion de Saldo"
+# (ya viene seleccionada por defecto) + solo Fecha Desde -> dialogo de
+# confirmacion real EXACTO: "No ha seleccionado ningún filtro, se
+# mostrarán todos los pagos entre las fechas seleccionadas. ¿Desea
+# continuar?"; al aceptar, la consulta corre real (sin error) y da "No
+# se encontraron pagos con los filtros vigentes." (0 resultados con
+# fecha 01/01/2026 - rango sin datos reales, no un error).
+#
+# CP031-035/037 QUEDAN PENDIENTES (28/10/2026): falta explorar que
+# rango de fecha/filtros SI trae resultados reales (mismo patron que
+# RF-04, donde los datos reales resultaron ser historicos de 2005) y
+# los casos de limite de dias/operador restringido/exportacion
+# necesitan mas tiempo de exploracion en vivo que el disponible en esta
+# sesion. El backend funcionando es la base ya confirmada - falta
+# terminar de escribir los cuerpos.
+
+_MOTIVO_PENDIENTE_RF05 = (
+    "backend confirmado operativo el 28/10/2026 (ya no da 503) - falta encontrar el rango de "
+    "fecha/filtros real que trae resultados (mismo patron que RF-04, datos historicos) y "
+    "terminar la exploracion en vivo del resto de las validaciones. Ver "
+    "_framework/modulos/consulta_pagos.py."
+)
+
+CUERPOS_REALES["CP031"] = f'''
+raise NotImplementedError("CP031 (RF-05 - Busqueda exitosa, Actualizacion de Saldo por defecto): {_MOTIVO_PENDIENTE_RF05}")
+'''
+CUERPOS_REALES["CP032"] = f'''
+raise NotImplementedError("CP032 (RF-05 - Cambio a Otros Conceptos habilita filtros exclusivos): {_MOTIVO_PENDIENTE_RF05}")
+'''
+CUERPOS_REALES["CP033"] = f'''
+raise NotImplementedError("CP033 (RF-05 - Limite de 15 dias, Actualizacion de Saldo): {_MOTIVO_PENDIENTE_RF05}")
+'''
+CUERPOS_REALES["CP034"] = f'''
+raise NotImplementedError("CP034 (RF-05 - Sin limite de dias, No Ubicados): {_MOTIVO_PENDIENTE_RF05}")
+'''
+CUERPOS_REALES["CP035"] = f'''
+raise NotImplementedError("CP035 (RF-05 - Operador de fecha restringido en modo simple): {_MOTIVO_PENDIENTE_RF05}")
+'''
+
+CUERPOS_REALES["CP036"] = '''
+app, frame = abrir_consulta_pagos(page, paso_excel=1)
+texto_inicial = frame.locator("body").inner_text()
+assert "Actualización de Saldo" in texto_inicial, (
+    f"Se esperaba 'Actualización de Saldo' como Referencia por defecto: {texto_inicial[:300]!r}"
+)
+capturar_paso(app, "referencia_por_defecto", paso_excel=2)
+
+frame.locator("#txtFechaInicial").fill("2026-01-01")
+app.wait_for_timeout(500)
+capturar_paso(app, "solo_fecha_sin_otro_filtro", paso_excel=3)
+
+frame.locator("button", has_text=re.compile(r"^\\s*Leer\\s*$")).click()
+app.wait_for_timeout(2000)
+modal = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile(".", re.S))
+assert modal.count() and modal.first.is_visible(), "Se esperaba el dialogo de confirmacion por falta de filtros"
+mensaje = modal.first.inner_text()
+capturar_paso(app, "confirmacion_sin_filtros", paso_excel=4)
+assert "no ha seleccionado ning" in mensaje.lower() and "desea continuar" in mensaje.lower(), (
+    f"No se vio el mensaje de confirmacion esperado: {mensaje!r}"
+)
+
+modal.first.get_by_role("button", name=re.compile("Aceptar", re.I)).click()
+app.wait_for_timeout(3000)
+texto_resultado = frame.locator("body").inner_text()
+capturar_paso(app, "consulta_ejecutada_sin_error", paso_excel=5)
+assert "error" not in texto_resultado.lower(), f"No se esperaba un error tras confirmar: {texto_resultado[-300:]!r}"
+'''
+
+CUERPOS_REALES["CP037"] = f'''
+raise NotImplementedError("CP037 (RF-05 - Guardar exporta el universo completo con permiso): {_MOTIVO_PENDIENTE_RF05}")
+'''
 
 CUERPOS_REALES["CP038"] = '''
 app, frame = abrir_mantenedor_inspectores(page, paso_excel=1)
@@ -921,6 +1122,58 @@ _MOTIVO_BLOQUEO_RF09_FECHA = (
     "componente de fecha."
 )
 
+# RF-08 "Consulta de Solicitudes de Reposicion Pendientes" (CP057-CP063)
+# - RE-VERIFICADO EN VIVO 28/10/2026: el "combo roto" documentado el
+# 28/09/2026 NO se reproduce un mes despues (misma cuenta DCABA_DW) -
+# ambos nz-select cargan con datos reales. Ver ficha tecnica completa
+# en _framework/modulos/consulta_solicitudes_reposicion_pendientes.py.
+#
+# CP062 confirmado con dato real: Leer sin ningun filtro puesto ->
+# modal de Ventana de Validacion real EXACTO: "Debe Seleccionar algún
+# filtro para la consulta".
+#
+# CP057-061/063 QUEDAN PENDIENTES (28/10/2026): backend/combos
+# confirmados operativos, falta terminar la exploracion en vivo de cada
+# validacion puntual (busqueda con resultados reales, limites de rango,
+# Anular) - no alcanzo el tiempo en esta sesion.
+
+_MOTIVO_PENDIENTE_RF08 = (
+    "combos y backend confirmados operativos el 28/10/2026 (el 'combo roto' documentado el "
+    "28/09/2026 no se reproduce) - falta terminar la exploracion en vivo de esta validacion "
+    "puntual. Ver _framework/modulos/consulta_solicitudes_reposicion_pendientes.py."
+)
+
+CUERPOS_REALES["CP057"] = f'''
+raise NotImplementedError("CP057 (RF-08 - Busqueda exitosa de solicitudes pendientes): {_MOTIVO_PENDIENTE_RF08}")
+'''
+CUERPOS_REALES["CP058"] = f'''
+raise NotImplementedError("CP058 (RF-08 - Validacion de fecha invalida): {_MOTIVO_PENDIENTE_RF08}")
+'''
+CUERPOS_REALES["CP059"] = f'''
+raise NotImplementedError("CP059 (RF-08 - Rango inferior obligatorio no ingresado): {_MOTIVO_PENDIENTE_RF08}")
+'''
+CUERPOS_REALES["CP060"] = f'''
+raise NotImplementedError("CP060 (RF-08 - Rango superior obligatorio en filtro Entre): {_MOTIVO_PENDIENTE_RF08}")
+'''
+CUERPOS_REALES["CP061"] = f'''
+raise NotImplementedError("CP061 (RF-08 - Rango de fechas, comportamiento configurable): {_MOTIVO_PENDIENTE_RF08}")
+'''
+
+CUERPOS_REALES["CP062"] = '''
+app, frame = abrir_reposicion_pendientes(page, paso_excel=1)
+capturar_paso(app, "pantalla_inicial_sin_filtros", paso_excel=2)
+
+mensaje = leer_reposicion_pendientes(app, frame)
+capturar_paso(app, "mensaje_al_menos_un_filtro", paso_excel=3)
+assert mensaje is not None and "filtro" in mensaje.lower() and "seleccionar" in mensaje.lower(), (
+    f"Se esperaba el mensaje de 'debe seleccionar algun filtro': {mensaje!r}"
+)
+'''
+
+CUERPOS_REALES["CP063"] = f'''
+raise NotImplementedError("CP063 (RF-08 - Anular exitoso): {_MOTIVO_PENDIENTE_RF08}")
+'''
+
 CUERPOS_REALES["CP064"] = f'''
 raise NotImplementedError("CP064 (RF-09 - Búsqueda exitosa usando únicamente el filtro de fecha): {_MOTIVO_BLOQUEO_RF09_FECHA}")
 '''
@@ -943,9 +1196,16 @@ raise NotImplementedError("CP071 (RF-09 - Búsqueda sin resultados): {_MOTIVO_BL
 
 # RF-02/03/04/06 requieren la cuenta DCABA_DW (le faltan roles funcionales
 # a SCASTI_DW - ver memoria project_pr000349_sp2_status y ficha tecnica de
-# cada modulo). CP009-030, CP038-048, CP072 usan DCABA_DW; el resto sigue
-# con SCASTI_DW (default de add()).
-_CPS_DCABA_DW = {f"CP{n:03d}" for n in range(9, 25)} | {f"CP{n:03d}" for n in range(25, 31)} | {f"CP{n:03d}" for n in range(38, 49)} | {"CP072"}
+# cada modulo). CP009-030, CP038-048, CP049-056, CP072 usan DCABA_DW; el
+# resto sigue con SCASTI_DW (default de add()).
+#
+# CP049-056 (RF-07) agregado 28/10/2026: confirmado en vivo que el menu
+# "Comercial > Consulta De Cortes Pendientes" NO aparece con SCASTI_DW
+# (RuntimeError "No se encontro un enlace de menu visible" en los 72
+# casos de esa corrida) pero SI aparece y abre bien con DCABA_DW -
+# mismo patron ya visto en otras RF de este proyecto (rol/acceso
+# presente en una cuenta y no en la otra).
+_CPS_DCABA_DW = {f"CP{n:03d}" for n in range(9, 25)} | {f"CP{n:03d}" for n in range(25, 38)} | {f"CP{n:03d}" for n in range(38, 64)} | {"CP072"}
 
 # --- Un add() por cada uno de los 72 casos de matriz_casos.json, en orden ---
 for _cp in sorted(MATRIZ, key=lambda x: int(x[2:])):

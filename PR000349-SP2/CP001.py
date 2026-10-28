@@ -602,6 +602,179 @@ def confirmar_imprimir(app, frame):
 
 
 #
+# Modulo: Mantenimiento de Ordenes de Conexion (Web LDS)
+# Componente Angular: app-mantord
+# Ruta de menu confirmada en vivo: Comercial > Mantenimiento De Ordenes De Conexion
+# Sistema/frente de negocio: Gestion de Clientes / Acticome (NUCLI)
+#
+# Este archivo es el INSUMO reutilizable para generar casos de prueba de
+# este modulo en CUALQUIER proyecto/sprint que vuelva a tocarlo - no
+# depende de ningun proyecto puntual.
+#
+# ============================================================================
+# FICHA TECNICA (confirmado en vivo, PR000349-SP2, 28/10/2026)
+# ============================================================================
+#
+# **Backend confirmado operativo el 28/10/2026** - en una corrida anterior
+# (28/09/2026) esta pantalla daba error 503 y quedo documentada como
+# "backend caido"; un mes despues, misma cuenta, carga y responde
+# perfecto. Antes de asumir un defecto de infraestructura permanente,
+# reintentar en una sesion nueva (mismo patron ya documentado en el
+# checklist para RF-09/RF-10 de PR000349-SP1).
+#
+# Requiere rol funcional con permiso sobre SRV.MANTORD - la matriz de
+# roles con permiso vigente sobre este recurso incluye 88 roles (ADMINIST,
+# CONSCLIE, JEFESUCU, GERENTE, INSPECT, RELNUCLI, entre otros). Confirmado
+# que DCABA_DW tiene acceso (SCASTI_DW no se probo especificamente para
+# este RF).
+#
+# **Selectores reales**: `#numeroCliente` (input de texto), botones por
+# texto exacto Limpiar/Anular/Actualizar/Leer (Anular y Actualizar
+# deshabilitados hasta Leer). El resultado de Leer puede ser:
+# 1. Un dialogo `.ant-modal`/`nz-modal-container` ("Ventana de
+#    Validacion") si NO se encontro orden, o si la orden esta bloqueada
+#    por un proceso externo.
+# 2. La orden cargada SIN dialogo, con sus secciones "ORDEN DE CONEXION"
+#    (Nombre/Direccion/Rol de Creacion/etc.) y "PROCEDIMIENTOS/MENSAJES DE
+#    ENRUTAMIENTO" pobladas.
+#
+# **Mensajes reales confirmados** (coinciden exacto con el EF):
+# - Sin orden: "No se encontró Orden de Conexión del Cliente."
+# - Orden generada por ACTICOME (bloqueada): "El NUCLI fue generado por
+#   el ACTICOME, favor trabajar en dicho módulo" - confirmado en vivo con
+#   clientes reales 1830410, 1764523, 1920482.
+# - Orden de otro usuario (no creador, sin privilegio de edicion ajena):
+#   tras Leer, NO aparece ningun dialogo - la orden carga directo con el
+#   texto "Ud. no ingresó la Orden de Conexión. Sólo puede consultar" en
+#   la seccion de resultado, y los botones Anular/Actualizar quedan
+#   deshabilitados. Confirmado en vivo con clientes reales 1259207 y
+#   1415959.
+#
+# **Gotcha de busqueda de datos**: NO hay forma de listar/filtrar ordenes
+# desde esta pantalla (exige un numero de cliente puntual). Para encontrar
+# clientes en cada estado (sin orden / orden ajena / orden propia /
+# anulada), escanear una lista de clientes ya conocidos del proyecto via
+# Leer real (igual metodo que PR000349-SP1 con ValidarCliente) en vez de
+# perseguir el esquema SQL real primero.
+#
+# **PENDIENTE SIN RESOLVER (confirmado 28/10/2026, documentado tambien en
+# la propia matriz de casos del cliente)**: no se encontro ningun cliente
+# real cuya orden de conexion haya sido CREADA por la cuenta de prueba
+# (DCABA_DW/SCASTI_DW) - la propia matriz Excel ya trae una nota de
+# Desarrollo: "no se encontró dato real que la satisfaga; nucli.rol_creacion
+# nunca coincide". Sin este dato no se puede automatizar CP009 (Leer
+# exitoso como creador) ni los casos de Actualizar/Anular que dependen de
+# serlo (CP012/013/014/015/016) salvo via el camino de usuario privilegiado
+# (rol JEFESUCU, ver CP072) o consiguiendo el dato por otra via (BD,
+# Desarrollo). Tampoco se encontro ningun cliente con orden YA ANULADA
+# (CP011) en el escaneo inicial de ~25 clientes conocidos del proyecto.
+#
+
+
+def abrir_mantord(page, paso_excel=None):
+    return abrir_aplicacion(page, ["Comercial", "Mantenimiento De Ordenes De Conexion"], "app-mantord", paso_excel=paso_excel)
+
+
+def leer_orden(app, frame, numero_cliente):
+    """Escribe el numero de cliente y pulsa Leer. Si aparece un dialogo
+    de Ventana de Validacion, lo cierra y devuelve su texto; si la orden
+    carga directo (sin dialogo), devuelve None."""
+    campo = frame.locator("#numeroCliente")
+    campo.click()
+    campo.fill("")
+    campo.fill(str(numero_cliente))
+    app.wait_for_timeout(300)
+    frame.locator("button", has_text=re.compile(r"^\s*Leer\s*$")).click()
+    app.wait_for_timeout(2000)
+    modal = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile(".", re.S))
+    if modal.count() and modal.first.is_visible():
+        mensaje = modal.first.inner_text()
+        modal.first.get_by_role("button", name=re.compile("Aceptar", re.I)).click()
+        app.wait_for_timeout(500)
+        return mensaje
+    return None
+
+
+def limpiar(app, frame):
+    boton = frame.locator("button", has_text=re.compile(r"^\s*Limpiar\s*$"))
+    for _ in range(15):
+        if boton.is_enabled():
+            boton.click()
+            return
+        app.wait_for_timeout(500)
+
+
+#
+# Modulo: Consulta de Cortes y Reconexiones (Web LDS)
+# Componente Angular: app-cortes-reconexiones
+# Ruta de menu confirmada en vivo: Comercial > Consulta De Cortes Y Reconexiones
+# Sistema/frente de negocio: Gestion de Cortes (CONCRCLI)
+#
+# Este archivo es el INSUMO reutilizable para generar casos de prueba de
+# este modulo en CUALQUIER proyecto/sprint que vuelva a tocarlo - no
+# depende de ningun proyecto puntual.
+#
+# ============================================================================
+# FICHA TECNICA (confirmado en vivo, PR000349-SP2, 28/10/2026)
+# ============================================================================
+#
+# **Backend confirmado operativo** - en una corrida anterior (28/09/2026)
+# esta pantalla daba 504 y quedo documentada como "backend caido"; un mes
+# despues, misma cuenta (DCABA_DW), carga y responde perfecto. Mismo
+# patron ya confirmado en RF-02 y RF-05 de este mismo proyecto.
+#
+# **Selectores reales**: 2 radios de Tipo de Corte (el primero,
+# "Inconsistencias Corte Fresco", viene MARCADO por defecto - confirma
+# CP017; el segundo es "Verificaciones"), `#fldNumeroCliente`,
+# `#fldProcesos` (select, "(Sin selección)" + 3 motivos reales),
+# `#fldSucursal` (10 sucursales reales + "Sin Sucursal"), `#fldSector`,
+# `#fldZona`, `#fldProveedor`, `#fldTipoFiltroFecha` (select: `=`, `<=`,
+# `>=`, `entre` - **"entre" es el valor por defecto**, por lo que hacen
+# falta AMBOS campos de fecha). Los campos de fecha reales son
+# `input[type=date]` NATIVOS (hay 2: inicial y final) - no tienen el
+# defecto de freeze de RF-07/09 (nz-date-picker). Botones Leer / "Guardar
+# como..." (deshabilitado hasta Leer) / Limpiar.
+#
+# **Confirmacion real confirmada (RN de "sin filtro")**: con ambas fechas
+# puestas (operador "entre" por defecto) pero SIN ningun otro filtro
+# (Procesos, Sucursal, etc.), aparece el modal "Confirmación": *"No ha
+# seleccionado ningún filtro, se mostrarán todos los datos entre las
+# fechas seleccionadas. ¿Desea continuar?"* - mismo patron ya visto en
+# RF-04 y RF-05 de este proyecto.
+#
+# **Validacion real confirmada**: con el operador "entre" por defecto y
+# solo UNA fecha llena (falta la otra), modal "Ventana de Validación":
+# *"Debe ingresar los dos valores del rango."*
+# ============================================================================
+#
+
+
+def abrir_cortes_reconexiones(page, paso_excel=None):
+    return abrir_aplicacion(page, ["Comercial", "Consulta De Cortes Y Reconexiones"], "app-cortes-reconexiones", paso_excel=paso_excel)
+
+
+def leer_cortes_reconexiones(app, frame, aceptar_confirmacion=True):
+    """Pulsa Leer y maneja el dialogo que aparezca. Devuelve una tupla
+    (tipo, texto): tipo es 'validacion', 'confirmacion' o None (sin
+    dialogo, consulta corrio directo)."""
+    frame.locator("button", has_text=re.compile(r"^\s*Leer\s*$")).click()
+    app.wait_for_timeout(2000)
+    modal = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile(".", re.S))
+    if not (modal.count() and modal.first.is_visible()):
+        return None, None
+    texto = modal.first.inner_text()
+    if "confirmaci" in texto.lower() and aceptar_confirmacion:
+        modal.first.get_by_role("button", name=re.compile("Aceptar", re.I)).click()
+        app.wait_for_timeout(3000)
+        return "confirmacion", texto
+    if "validaci" in texto.lower():
+        modal.first.get_by_role("button", name=re.compile("Aceptar", re.I)).click()
+        app.wait_for_timeout(500)
+        return "validacion", texto
+    return "confirmacion", texto
+
+
+#
 # Modulo: Consulta de Cuadratura de Sesion (Web LDS)
 # Ruta de menu confirmada en vivo: Comercial > Consulta De Cuadratura De Sesion
 # Sistema/frente de negocio: Recaudacion (recauda/pagoscent/cuadrasesion)
@@ -738,6 +911,86 @@ def cerrar_modal_cuadratura(frame, boton="Aceptar"):
 
 def filas_cuadratura_sesion(frame):
     return frame.locator("table.grid tbody tr")
+
+
+#
+# Modulo: Consulta de Pagos (Web LDS)
+# Componente Angular: app-consulta-pago
+# Ruta de menu confirmada en vivo: Comercial > Consulta De Pagos
+# Sistema/frente de negocio: Recaudacion (CONSPAG)
+#
+# Este archivo es el INSUMO reutilizable para generar casos de prueba de
+# este modulo en CUALQUIER proyecto/sprint que vuelva a tocarlo - no
+# depende de ningun proyecto puntual.
+#
+# ============================================================================
+# FICHA TECNICA (confirmado en vivo, PR000349-SP2, 28/10/2026)
+# ============================================================================
+#
+# **Backend confirmado operativo** - en una corrida anterior (28/09/2026)
+# esta pantalla daba 503 y quedo documentada como "backend caido"; un mes
+# despues, misma cuenta (DCABA_DW), carga y responde perfecto. Mismo
+# patron ya confirmado en RF-02 (Mantenimiento de Ordenes de Conexion) de
+# este mismo proyecto - antes de asumir un defecto de infraestructura
+# permanente, reintentar en una sesion nueva.
+#
+# **GOTCHA REAL CONFIRMADO: `get_by_role("button", name=re.compile(...))`
+# CRASHEA el navegador en esta pantalla (2/2 veces reproducido,
+# "Target crashed").** Usar SIEMPRE `frame.locator("button",
+# has_text=re.compile(...))` para los botones de esta pantalla, nunca
+# get_by_role con regex - no se investigo la causa exacta (posible
+# problema de calculo de accessible-name sobre el arbol de esta pantalla
+# en particular), pero el selector alternativo funciona sin problema.
+#
+# **Selectores reales**: `#txtFechaInicial` (`<input type="date">`
+# NATIVO, no nz-date-picker - no tiene el defecto de freeze de RF-07/09),
+# `#txtMontoInicial`, `#txtNumeroCliente`, `#txtDoctoInicial`. Combo
+# "Referencia" con **"Actualización de Saldo" como opcion por defecto**
+# (coincide con CP031 "tipo por defecto"). Botones por texto exacto:
+# Leer (pasa a decir "Siguiente" tras el primer Leer exitoso, paginacion
+# de a 25 - mismo patron que otras pantallas de este proyecto),
+# "Calcular total" y "Guardar como..." (deshabilitados hasta Leer),
+# Limpiar.
+#
+# **Confirmacion real confirmada (RN de "sin filtro")**: al presionar
+# Leer con los filtros en su estado por defecto (solo fecha, sin otro
+# filtro puesto), aparece el modal "Confirmación" ("?"): *"No ha
+# seleccionado ningún filtro, se mostrarán todos los pagos entre las
+# fechas seleccionadas. ¿Desea continuar?"* - mismo patron ya visto en
+# RF-04 (Cuadratura de Sesion) de este mismo proyecto.
+#
+# **Resultado vacio real confirmado**: "No se encontraron pagos con los
+# filtros vigentes." + "Registros mostrados: 0 — se cargan bloques
+# adicionales de 25 al continuar leyendo" - con fecha desde 01/01/2026
+# sin mas filtro, 0 resultados (los datos reales de Pruebas pueden ser
+# historicos, igual que en RF-04, donde los datos reales eran de 2005 -
+# no se confirmo aun que rango de fecha SI trae resultados reales para
+# esta pantalla).
+# ============================================================================
+#
+
+
+def abrir_consulta_pagos(page, paso_excel=None):
+    return abrir_aplicacion(page, ["Comercial", "Consulta De Pagos"], "app-consulta-pago", paso_excel=paso_excel)
+
+
+def leer_pagos(app, frame):
+    """Pulsa Leer (o Siguiente, tras el primer Leer exitoso) y cierra el
+    dialogo de confirmacion ("sin filtro") si aparece, aceptandolo.
+    Devuelve el texto del dialogo de VALIDACION si aparece uno
+    (distinto del de confirmacion), o None si la consulta corrio
+    directo."""
+    frame.locator("button", has_text=re.compile(r"^\s*(Leer|Siguiente)\s*$")).click()
+    app.wait_for_timeout(2000)
+    modal = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile(".", re.S))
+    if modal.count() and modal.first.is_visible():
+        texto = modal.first.inner_text()
+        if "confirmaci" in texto.lower():
+            modal.first.get_by_role("button", name=re.compile("Aceptar", re.I)).click()
+            app.wait_for_timeout(3000)
+            return None
+        return texto
+    return None
 
 
 #
@@ -983,6 +1236,59 @@ def leer_cortes_pendientes(app, frame, timeout_ms=45000):
 def limpiar_cortes_pendientes(app, frame):
     frame.get_by_role("button", name=re.compile("Limpiar")).click()
     app.wait_for_timeout(600)
+
+
+#
+# Modulo: Consulta de Solicitudes de Reposicion Pendientes (Web LDS)
+# Componente Angular: app-reposicion-pendiente
+# Ruta de menu confirmada en vivo: Comercial > Consulta De Solicitudes De Reposicion Pendientes
+# Sistema/frente de negocio: Cortes y Reposicion (CONREPEN)
+#
+# Este archivo es el INSUMO reutilizable para generar casos de prueba de
+# este modulo en CUALQUIER proyecto/sprint que vuelva a tocarlo - no
+# depende de ningun proyecto puntual.
+#
+# ============================================================================
+# FICHA TECNICA (confirmado en vivo, PR000349-SP2, 28/10/2026)
+# ============================================================================
+#
+# **El "combo roto" documentado el 28/09/2026 NO se reproduce un mes
+# despues** - ambos combos (`nz-select`) cargan con datos reales:
+# "Sucursal Cliente" (12 opciones: "(Todas)" + 11 sucursales reales) y
+# "Fecha de Solicitud" (3 opciones: "(Sin filtro)" / "=" / "Entre").
+# Mismo patron de "problema transitorio, no permanente" ya confirmado en
+# RF-02/03/05 de este mismo proyecto.
+#
+# **Selectores reales**: `nz-select` x2 (Sucursal Cliente, Fecha de
+# Solicitud - orden de apertura en el DOM), inputs para N.° de Cliente y
+# Sector, botones por texto exacto Leer/Limpiar/"a Excel"/Anular (Anular
+# deshabilitado salvo con 1 solicitud pendiente/generada seleccionada).
+# Grilla de resultados con 22 columnas reales.
+#
+# **Validacion real confirmada**: presionar Leer con TODOS los filtros en
+# su estado por defecto (sin ningun filtro puesto) -> modal "Ventana de
+# Validación": *"Debe Seleccionar algún filtro para la consulta"*.
+# ============================================================================
+#
+
+
+def abrir_reposicion_pendientes(page, paso_excel=None):
+    return abrir_aplicacion(page, ["Comercial", "Consulta De Solicitudes De Reposicion Pendientes"], "app-reposicion-pendiente", paso_excel=paso_excel)
+
+
+def leer_reposicion_pendientes(app, frame):
+    """Pulsa Leer y devuelve el texto del modal de Ventana de
+    Validacion si aparece (cerrandolo), o None si la consulta corrio
+    directo."""
+    frame.locator("button", has_text=re.compile(r"^\s*Leer\s*$")).click()
+    app.wait_for_timeout(2000)
+    modal = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile(".", re.S))
+    if modal.count() and modal.first.is_visible():
+        texto = modal.first.inner_text()
+        modal.first.get_by_role("button", name=re.compile("Aceptar", re.I)).click()
+        app.wait_for_timeout(500)
+        return texto
+    return None
 
 
 #
@@ -1278,7 +1584,7 @@ def main():
         app = None
         _CASO_OK = False
         try:
-            login(page, paso_excel=1)
+            login(page)
             app, frame = abrir_consulta_clientes_ss(page, paso_excel=1)
             capturar_paso(app, "pantalla_inicial", paso_excel=1)
             boton_imprimir = frame.get_by_role("button", name=re.compile("Imprimir"))
@@ -1304,7 +1610,7 @@ def main():
                 ruta_portal = _renombrar_video(video_portal, EVIDENCIA / f"{CASO}-1.webm") if video_portal is not None else None
                 ruta_app = _renombrar_video(video_app, EVIDENCIA / f"{CASO}-2.webm") if video_app is not None else None
                 rutas_videos = [r for r in (ruta_portal, ruta_app) if r is not None]
-                rutas_videos.extend(p for p in sorted(EVIDENCIA.glob("page@*.webm")) if p not in rutas_videos)
+                rutas_videos.extend(sorted(EVIDENCIA.glob("page@*.webm")))
                 if len(rutas_videos) > 1:
                     _unir_videos(EVIDENCIA / f"{CASO}_video.webm", *rutas_videos)
                 elif len(rutas_videos) == 1:
