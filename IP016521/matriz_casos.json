@@ -1,0 +1,24 @@
+{
+  "CP01": {
+    "rf": "RF01",
+    "cu": "CU01",
+    "cp": "CP01",
+    "name": "Bloqueo de Autorización periodos de comprobantes incorrectos",
+    "desc": "No permitir la autorización de Comprobantes si el periodo seleccionado no corresponde al periodo del comprobante, o en su defecto al periodo del mes próximo calendario.",
+    "precond": "Debe existir Comprobantes registrados\n\nAcceso al rol funcional  AUTRANSAP.TODOS",
+    "datos": "Usar filtro de la web para ubicar los comprobantes",
+    "esperado": "No se autoriza ningún comprobante si al menos 1 comprobante no cumplen la regla",
+    "pasos": "1. Ingresar a la Web https://pldsweb.luzdelsur.com.pe/Plataforma/PlataformaWeb/\n2. Ingresar a la opción Autorizador Comprobantes Transporte\n3. Filtrar para obtener comprobantes\n4. Seleccionar un periodo que no sea válido para los comprobantes marcados\n5. Clic en Autorizar\n6. El sistema debe validar que no es correcto la autorización y avisar al usuario."
+  },
+  "CP02": {
+    "rf": "RF1",
+    "cu": "CU1",
+    "cp": "CP02",
+    "name": "Autorización periodos de comprobantes correctos",
+    "desc": "Permitir la autorización de Comprobantes si el periodo seleccionado corresponde al periodo del comprobante, o en su defecto al periodo del mes próximo calendario.",
+    "precond": "Debe existir Comprobantes registrados\n\nAcceso al rol funcional  AUTRANSAP.TODOS",
+    "datos": "Usar filtro de la web para ubicar los comprobantes",
+    "esperado": "Se autorizan los comprobantes si todos cumplen la regla",
+    "pasos": "1. Ingresar a la Web https://pldsweb.luzdelsur.com.pe/Plataforma/PlataformaWeb/\n2. Ingresar a la opción Autorizador Comprobantes Transporte\n3. Filtrar para obtener comprobantes\n4. Seleccionar un periodo que sea válido para los comprobantes marcados\n5. Clic en Autorizar\n6. El sistema debe autorizar los comprobantes."
+  }
+}

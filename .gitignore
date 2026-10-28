@@ -1,10 +1,14 @@
 # Este repo versiona la base reutilizable (_framework) MAS los programas
-# de cada proyecto individual (PR0000NN/: generate_scripts.py, CPxxx.py,
-# run_all.py, matriz_casos.json) - pero NO su evidencia generada (videos,
-# capturas, Word, reportes), ni los documentos fuente del cliente
+# de cada proyecto individual (PR0000NN/ o IP0000NN/: generate_scripts.py,
+# CPxxx.py, run_all.py, matriz_casos.json) - pero NO su evidencia generada
+# (videos, capturas, Word, reportes), ni los documentos fuente del cliente
 # (Documentos/documentos con el Excel/Word de EF-ET), ni las carpetas
 # _exploracion/ (scripts descartables de investigacion en vivo). Ver
 # CLAUDE.md para la arquitectura completa.
+#
+# PR0000NN/ = proyectos por sprint (varios RF/casos). IP0000NN/ =
+# requerimientos individuales (IP = numero de ticket, agregado 27/10/2026
+# con IP016521) - mismo patron de carpeta, misma regla de .gitignore.
 /*
 !/_framework/
 !/.gitignore
@@ -12,14 +16,19 @@
 !/requirements.txt
 !/Opciones_Menu_Principal.xlsx
 !/PR*/
+!/IP*/
 
-# Dentro de cada PR*/: permitir solo los programas y su matriz, todo lo
-# demas (evidencia CPxxx/, Documentos/documentos/, reportes/,
+# Dentro de cada PR*/ o IP*/: permitir solo los programas y su matriz,
+# todo lo demas (evidencia CPxxx/, Documentos/documentos/, reportes/,
 # _exploracion/) queda ignorado por no listarse aca.
 PR*/*
+IP*/*
 !PR*/*.py
 !PR*/matriz_casos.json
 !PR*/casos_fallidos_confirmados.json
+!IP*/*.py
+!IP*/matriz_casos.json
+!IP*/casos_fallidos_confirmados.json
 
 # Dentro de _framework y de cada PR*: cache/generados/config local, nunca
 # codigo fuente
