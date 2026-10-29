@@ -1585,7 +1585,32 @@ def main():
         _CASO_OK = False
         try:
             login(page)
-            raise NotImplementedError("CP020 (RF-03 - Validacion de fecha calendario invalida): backend confirmado operativo el 28/10/2026 (ya no da 504) - falta terminar la exploracion en vivo de esta validacion puntual. Ver _framework/modulos/consulta_cortes_reconexiones.py.")
+            app, frame = abrir_cortes_reconexiones(page, paso_excel=1)
+            campo_fecha = frame.locator("input[type=date]").nth(0)
+            campo_fecha.click()
+            app.keyboard.type("31022026")  # dd mm aaaa tecleado segmento a segmento: 31 de febrero no existe
+            app.wait_for_timeout(300)
+            capturar_paso(app, "antes_de_buscar", paso_excel=1)
+
+            # HALLAZGO REAL confirmado en vivo 28/10/2026: a diferencia de RF-07/09
+            # (nz-date-picker, acepta cualquier texto y se congela), este campo es
+            # un <input type="date"> NATIVO del navegador - Chromium rechaza un dia
+            # de calendario que no existe (31 de febrero) ANTES de que el valor
+            # llegue al formulario Angular, dejando el campo vacio (value=""). Por
+            # eso la app nunca llega a mostrar "Fecha no válida.": lo que se
+            # reproduce en la practica es el mismo flujo de "sin fecha ingresada"
+            # que CP017/CP023, no un mensaje de validacion especifico de fecha.
+            valor_tras_teclear = campo_fecha.input_value()
+            assert valor_tras_teclear == "", (
+                f"Se esperaba que el navegador rechace la fecha inexistente (campo vacio): {valor_tras_teclear!r}"
+            )
+
+            tipo, mensaje = leer_cortes_reconexiones(app, frame, aceptar_confirmacion=True)
+            capturar_paso(app, "comportamiento_real_fecha_invalida", paso_excel=3)
+            assert tipo == "confirmacion" and "no ha seleccionado ning" in mensaje.lower(), (
+                f"Se esperaba que caiga en el flujo generico de 'sin filtro' (no existe 'Fecha no válida.' para un input "
+                f"nativo con un dia de calendario inexistente): tipo={tipo!r} mensaje={mensaje!r}"
+            )
 
             capturar_paso(app, "estado_final_del_caso", paso_excel=max(_parsear_pasos_excel(PASOS_CASO), default=None))
             _CASO_OK = True

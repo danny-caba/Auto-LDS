@@ -1585,7 +1585,43 @@ def main():
         _CASO_OK = False
         try:
             login(page)
-            raise NotImplementedError("CP017 (RF-03 - Busqueda exitosa, Tipo de Corte por defecto): backend confirmado operativo el 28/10/2026 (ya no da 504) - falta terminar la exploracion en vivo de esta validacion puntual. Ver _framework/modulos/consulta_cortes_reconexiones.py.")
+            app, frame = abrir_cortes_reconexiones(page, paso_excel=1)
+            radio_default = frame.locator("input[type=radio]").nth(0)
+            assert radio_default.is_checked(), "Se esperaba 'Inconsistencias Corte Fresco' marcado por defecto"
+            capturar_paso(app, "tipo_corte_por_defecto", paso_excel=2)
+
+            # Sin fechas, el rango "entre" por defecto no trae ningun registro real
+            # (confirmado en vivo): hace falta un rango amplio para que existan
+            # inconsistencias reales en el ambiente de Pruebas (datos historicos,
+            # igual que RF-04/RF-05 de este mismo proyecto).
+            fechas = frame.locator("input[type=date]")
+            fechas.nth(0).fill("2000-01-01")
+            fechas.nth(1).fill("2026-12-31")
+            capturar_paso(app, "antes_de_buscar", paso_excel=3)
+
+            tipo, mensaje = leer_cortes_reconexiones(app, frame, aceptar_confirmacion=True)
+            assert tipo == "confirmacion", f"Se esperaba la confirmacion de 'sin filtro' antes del resultado: tipo={tipo!r} mensaje={mensaje!r}"
+
+            # El backend puede tardar bastante en responder (confirmado en vivo:
+            # hasta ~90s) - se espera activamente a que aparezcan filas reales en
+            # la grilla en vez de una espera fija.
+            plazo = time.monotonic() + 90
+            filas = 0
+            while time.monotonic() < plazo:
+                filas = frame.locator("tr").count()
+                if filas > 0:
+                    break
+                app.wait_for_timeout(2000)
+            assert filas > 0, "No se cargo ningun registro tras esperar hasta 90s"
+            capturar_paso(app, "resultado_paginado", paso_excel=4)
+
+            badge = frame.get_by_text(re.compile(r"\d+\s+registro"))
+            assert badge.count() > 0, "No se encontro el indicador de cantidad de registros"
+            texto_badge = badge.first.inner_text()
+            assert "25" in texto_badge, f"Se esperaba un bloque de 25 registros: {texto_badge!r}"
+
+            boton_siguiente = frame.locator("button", has_text=re.compile(r"^\s*Siguiente\s*$"))
+            assert boton_siguiente.count() > 0, "No aparecio el boton 'Siguiente' (paginacion) tras el primer bloque de 25"
 
             capturar_paso(app, "estado_final_del_caso", paso_excel=max(_parsear_pasos_excel(PASOS_CASO), default=None))
             _CASO_OK = True

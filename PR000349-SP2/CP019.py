@@ -1585,7 +1585,18 @@ def main():
         _CASO_OK = False
         try:
             login(page)
-            raise NotImplementedError("CP019 (RF-03 - Validacion de rango de fecha incompleto): backend confirmado operativo el 28/10/2026 (ya no da 504) - falta terminar la exploracion en vivo de esta validacion puntual. Ver _framework/modulos/consulta_cortes_reconexiones.py.")
+            app, frame = abrir_cortes_reconexiones(page, paso_excel=1)
+            operador_default = frame.locator("#fldTipoFiltroFecha").input_value()
+            assert operador_default == "entre", f"Se esperaba 'entre' como operador de fecha por defecto: {operador_default!r}"
+
+            fechas = frame.locator("input[type=date]")
+            fechas.nth(0).fill("2026-05-10")
+            capturar_paso(app, "antes_de_buscar", paso_excel=2)
+
+            tipo, mensaje = leer_cortes_reconexiones(app, frame, aceptar_confirmacion=True)
+            assert tipo == "validacion", f"Se esperaba una ventana de validacion: tipo={tipo!r} mensaje={mensaje!r}"
+            capturar_paso(app, "mensaje_rango_incompleto", paso_excel=4)
+            assert "debe ingresar los dos valores del rango" in mensaje.lower(), f"Mensaje inesperado: {mensaje!r}"
 
             capturar_paso(app, "estado_final_del_caso", paso_excel=max(_parsear_pasos_excel(PASOS_CASO), default=None))
             _CASO_OK = True

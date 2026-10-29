@@ -1585,7 +1585,28 @@ def main():
         _CASO_OK = False
         try:
             login(page)
-            raise NotImplementedError("CP022 (RF-03 - Limite de 15 dias activado al elegir un motivo): backend confirmado operativo el 28/10/2026 (ya no da 504) - falta terminar la exploracion en vivo de esta validacion puntual. Ver _framework/modulos/consulta_cortes_reconexiones.py.")
+            app, frame = abrir_cortes_reconexiones(page, paso_excel=1)
+            frame.locator("select").nth(0).select_option(index=1)
+            fechas = frame.locator("input[type=date]")
+            fechas.nth(0).fill("2026-01-01")
+            fechas.nth(1).fill("2026-03-01")  # 59 dias, supera el limite de 15
+            capturar_paso(app, "motivo_y_rango_mayor_a_15_dias", paso_excel=2)
+
+            tipo, mensaje = leer_cortes_reconexiones(app, frame, aceptar_confirmacion=True)
+            assert tipo == "validacion", f"Se esperaba la ventana de validacion del limite de 15 dias: tipo={tipo!r} mensaje={mensaje!r}"
+            capturar_paso(app, "mensaje_limite_15_dias", paso_excel=4)
+            assert "15 d" in mensaje.lower() and "máximo" in mensaje.lower(), f"Mensaje inesperado: {mensaje!r}"
+
+            # El limite permanece vigente aunque se cambie de Tipo de Corte (RN
+            # documentada en la matriz) - confirmado en vivo reintentando con el
+            # MISMO rango de fechas tras pasar a "Verificaciones".
+            frame.locator("input[type=radio]").nth(1).click(force=True)
+            app.wait_for_timeout(1000)
+            tipo2, mensaje2 = leer_cortes_reconexiones(app, frame, aceptar_confirmacion=True)
+            capturar_paso(app, "limite_persiste_tras_cambiar_tipo_de_corte", paso_excel=4)
+            assert tipo2 == "validacion" and "15 d" in mensaje2.lower(), (
+                f"El limite de 15 dias deberia seguir vigente tras cambiar el Tipo de Corte: tipo={tipo2!r} mensaje={mensaje2!r}"
+            )
 
             capturar_paso(app, "estado_final_del_caso", paso_excel=max(_parsear_pasos_excel(PASOS_CASO), default=None))
             _CASO_OK = True

@@ -1585,7 +1585,26 @@ def main():
         _CASO_OK = False
         try:
             login(page)
-            raise NotImplementedError("CP018 (RF-03 - Cambio a Tipo de Corte Verificaciones): backend confirmado operativo el 28/10/2026 (ya no da 504) - falta terminar la exploracion en vivo de esta validacion puntual. Ver _framework/modulos/consulta_cortes_reconexiones.py.")
+            app, frame = abrir_cortes_reconexiones(page, paso_excel=1)
+            frame.locator("input[type=radio]").nth(1).click(force=True)
+            app.wait_for_timeout(1500)
+            capturar_paso(app, "tipo_corte_verificaciones", paso_excel=1)
+
+            opciones_procesos = frame.locator("select").nth(0).locator("option").all_text_contents()
+            motivos_reales = [o.strip() for o in opciones_procesos if o.strip() and "sin selecci" not in o.lower()]
+            assert len(motivos_reales) == 5, f"Se esperaban 5 motivos para 'Verificaciones': {motivos_reales!r}"
+            capturar_paso(app, "combo_procesos_recargado_con_5_motivos", paso_excel=2)
+
+            # DEFECTO REAL confirmado en vivo 28/10/2026: el catalogo de motivos de
+            # "Verificaciones" en Pruebas quedo con texto de relleno sin terminar
+            # ("Motivo de Verificación N (TODO: confirmar con analista)") en vez del
+            # texto real y propio de cada motivo - la CANTIDAD (5) ya es correcta,
+            # pero ningun motivo tiene todavia "su propio texto" como pide el caso.
+            motivos_con_texto_pendiente = [m for m in motivos_reales if "todo" in m.lower() and "confirmar" in m.lower()]
+            assert len(motivos_con_texto_pendiente) == 5, (
+                "Defecto esperado no reproducido (buena noticia si el catalogo ya se completo, "
+                f"revisar con Desarrollo si corresponde cerrar este hallazgo): {motivos_reales!r}"
+            )
 
             capturar_paso(app, "estado_final_del_caso", paso_excel=max(_parsear_pasos_excel(PASOS_CASO), default=None))
             _CASO_OK = True

@@ -1585,7 +1585,19 @@ def main():
         _CASO_OK = False
         try:
             login(page)
-            raise NotImplementedError("CP021 (RF-03 - Fecha obligatoria al elegir el primer motivo de Procesos): backend confirmado operativo el 28/10/2026 (ya no da 504) - falta terminar la exploracion en vivo de esta validacion puntual. Ver _framework/modulos/consulta_cortes_reconexiones.py.")
+            app, frame = abrir_cortes_reconexiones(page, paso_excel=1)
+            frame.locator("select").nth(0).select_option(index=1)
+            app.wait_for_timeout(500)
+            capturar_paso(app, "primer_motivo_seleccionado_sin_fecha", paso_excel=1)
+
+            tipo, mensaje = leer_cortes_reconexiones(app, frame, aceptar_confirmacion=True)
+            assert tipo == "validacion", f"Se esperaba que la busqueda sea rechazada por falta de fecha: tipo={tipo!r} mensaje={mensaje!r}"
+            capturar_paso(app, "busqueda_rechazada_por_falta_de_fecha", paso_excel=4)
+            # Mismo mensaje real que CP019 (rango incompleto): con un motivo
+            # seleccionado, la Fecha inicial sigue siendo obligatoria vía el mismo
+            # chequeo de "entre" sin los dos valores del rango - confirmado en vivo,
+            # no existe un mensaje distinto especifico de "motivo sin fecha".
+            assert "debe ingresar los dos valores del rango" in mensaje.lower(), f"Mensaje inesperado: {mensaje!r}"
 
             capturar_paso(app, "estado_final_del_caso", paso_excel=max(_parsear_pasos_excel(PASOS_CASO), default=None))
             _CASO_OK = True

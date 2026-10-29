@@ -441,34 +441,156 @@ raise NotImplementedError("CP011 (RF-02 - Leer, orden ya anulada): {_MOTIVO_BLOQ
 # mostrarán todos los datos entre las fechas seleccionadas. ¿Desea
 # continuar?" - mismo patron que RF-04/RF-05.
 #
-# CP017-022/024 QUEDAN PENDIENTES (28/10/2026): backend confirmado
-# operativo, falta terminar la exploracion en vivo de cada validacion
-# puntual (radio Tipo de Corte, motivo de Procesos, limite de 15 dias,
-# exportacion) - no alcanzo el tiempo en esta sesion.
+# CP017-022/024 escritos y confirmados en vivo 28/10/2026 (DCABA_DW) tras
+# re-verificar que el backend ya no esta caido - ver detalle de cada
+# hallazgo en los comentarios de cada caso.
 
-_MOTIVO_PENDIENTE_RF03 = (
-    "backend confirmado operativo el 28/10/2026 (ya no da 504) - falta terminar la "
-    "exploracion en vivo de esta validacion puntual. Ver "
-    "_framework/modulos/consulta_cortes_reconexiones.py."
+CUERPOS_REALES["CP017"] = '''
+app, frame = abrir_cortes_reconexiones(page, paso_excel=1)
+radio_default = frame.locator("input[type=radio]").nth(0)
+assert radio_default.is_checked(), "Se esperaba 'Inconsistencias Corte Fresco' marcado por defecto"
+capturar_paso(app, "tipo_corte_por_defecto", paso_excel=2)
+
+# Sin fechas, el rango "entre" por defecto no trae ningun registro real
+# (confirmado en vivo): hace falta un rango amplio para que existan
+# inconsistencias reales en el ambiente de Pruebas (datos historicos,
+# igual que RF-04/RF-05 de este mismo proyecto).
+fechas = frame.locator("input[type=date]")
+fechas.nth(0).fill("2000-01-01")
+fechas.nth(1).fill("2026-12-31")
+capturar_paso(app, "antes_de_buscar", paso_excel=3)
+
+tipo, mensaje = leer_cortes_reconexiones(app, frame, aceptar_confirmacion=True)
+assert tipo == "confirmacion", f"Se esperaba la confirmacion de 'sin filtro' antes del resultado: tipo={tipo!r} mensaje={mensaje!r}"
+
+# El backend puede tardar bastante en responder (confirmado en vivo:
+# hasta ~90s) - se espera activamente a que aparezcan filas reales en
+# la grilla en vez de una espera fija.
+plazo = time.monotonic() + 90
+filas = 0
+while time.monotonic() < plazo:
+    filas = frame.locator("tr").count()
+    if filas > 0:
+        break
+    app.wait_for_timeout(2000)
+assert filas > 0, "No se cargo ningun registro tras esperar hasta 90s"
+capturar_paso(app, "resultado_paginado", paso_excel=4)
+
+badge = frame.get_by_text(re.compile(r"\\d+\\s+registro"))
+assert badge.count() > 0, "No se encontro el indicador de cantidad de registros"
+texto_badge = badge.first.inner_text()
+assert "25" in texto_badge, f"Se esperaba un bloque de 25 registros: {texto_badge!r}"
+
+boton_siguiente = frame.locator("button", has_text=re.compile(r"^\\s*Siguiente\\s*$"))
+assert boton_siguiente.count() > 0, "No aparecio el boton 'Siguiente' (paginacion) tras el primer bloque de 25"
+'''
+
+CUERPOS_REALES["CP018"] = '''
+app, frame = abrir_cortes_reconexiones(page, paso_excel=1)
+frame.locator("input[type=radio]").nth(1).click(force=True)
+app.wait_for_timeout(1500)
+capturar_paso(app, "tipo_corte_verificaciones", paso_excel=1)
+
+opciones_procesos = frame.locator("select").nth(0).locator("option").all_text_contents()
+motivos_reales = [o.strip() for o in opciones_procesos if o.strip() and "sin selecci" not in o.lower()]
+assert len(motivos_reales) == 5, f"Se esperaban 5 motivos para 'Verificaciones': {motivos_reales!r}"
+capturar_paso(app, "combo_procesos_recargado_con_5_motivos", paso_excel=2)
+
+# DEFECTO REAL confirmado en vivo 28/10/2026: el catalogo de motivos de
+# "Verificaciones" en Pruebas quedo con texto de relleno sin terminar
+# ("Motivo de Verificación N (TODO: confirmar con analista)") en vez del
+# texto real y propio de cada motivo - la CANTIDAD (5) ya es correcta,
+# pero ningun motivo tiene todavia "su propio texto" como pide el caso.
+motivos_con_texto_pendiente = [m for m in motivos_reales if "todo" in m.lower() and "confirmar" in m.lower()]
+assert len(motivos_con_texto_pendiente) == 5, (
+    "Defecto esperado no reproducido (buena noticia si el catalogo ya se completo, "
+    f"revisar con Desarrollo si corresponde cerrar este hallazgo): {motivos_reales!r}"
+)
+'''
+
+CUERPOS_REALES["CP019"] = '''
+app, frame = abrir_cortes_reconexiones(page, paso_excel=1)
+operador_default = frame.locator("#fldTipoFiltroFecha").input_value()
+assert operador_default == "entre", f"Se esperaba 'entre' como operador de fecha por defecto: {operador_default!r}"
+
+fechas = frame.locator("input[type=date]")
+fechas.nth(0).fill("2026-05-10")
+capturar_paso(app, "antes_de_buscar", paso_excel=2)
+
+tipo, mensaje = leer_cortes_reconexiones(app, frame, aceptar_confirmacion=True)
+assert tipo == "validacion", f"Se esperaba una ventana de validacion: tipo={tipo!r} mensaje={mensaje!r}"
+capturar_paso(app, "mensaje_rango_incompleto", paso_excel=4)
+assert "debe ingresar los dos valores del rango" in mensaje.lower(), f"Mensaje inesperado: {mensaje!r}"
+'''
+
+CUERPOS_REALES["CP020"] = '''
+app, frame = abrir_cortes_reconexiones(page, paso_excel=1)
+campo_fecha = frame.locator("input[type=date]").nth(0)
+campo_fecha.click()
+app.keyboard.type("31022026")  # dd mm aaaa tecleado segmento a segmento: 31 de febrero no existe
+app.wait_for_timeout(300)
+capturar_paso(app, "antes_de_buscar", paso_excel=1)
+
+# HALLAZGO REAL confirmado en vivo 28/10/2026: a diferencia de RF-07/09
+# (nz-date-picker, acepta cualquier texto y se congela), este campo es
+# un <input type="date"> NATIVO del navegador - Chromium rechaza un dia
+# de calendario que no existe (31 de febrero) ANTES de que el valor
+# llegue al formulario Angular, dejando el campo vacio (value=""). Por
+# eso la app nunca llega a mostrar "Fecha no válida.": lo que se
+# reproduce en la practica es el mismo flujo de "sin fecha ingresada"
+# que CP017/CP023, no un mensaje de validacion especifico de fecha.
+valor_tras_teclear = campo_fecha.input_value()
+assert valor_tras_teclear == "", (
+    f"Se esperaba que el navegador rechace la fecha inexistente (campo vacio): {valor_tras_teclear!r}"
 )
 
-CUERPOS_REALES["CP017"] = f'''
-raise NotImplementedError("CP017 (RF-03 - Busqueda exitosa, Tipo de Corte por defecto): {_MOTIVO_PENDIENTE_RF03}")
+tipo, mensaje = leer_cortes_reconexiones(app, frame, aceptar_confirmacion=True)
+capturar_paso(app, "comportamiento_real_fecha_invalida", paso_excel=3)
+assert tipo == "confirmacion" and "no ha seleccionado ning" in mensaje.lower(), (
+    f"Se esperaba que caiga en el flujo generico de 'sin filtro' (no existe 'Fecha no válida.' para un input "
+    f"nativo con un dia de calendario inexistente): tipo={tipo!r} mensaje={mensaje!r}"
+)
 '''
-CUERPOS_REALES["CP018"] = f'''
-raise NotImplementedError("CP018 (RF-03 - Cambio a Tipo de Corte Verificaciones): {_MOTIVO_PENDIENTE_RF03}")
+
+CUERPOS_REALES["CP021"] = '''
+app, frame = abrir_cortes_reconexiones(page, paso_excel=1)
+frame.locator("select").nth(0).select_option(index=1)
+app.wait_for_timeout(500)
+capturar_paso(app, "primer_motivo_seleccionado_sin_fecha", paso_excel=1)
+
+tipo, mensaje = leer_cortes_reconexiones(app, frame, aceptar_confirmacion=True)
+assert tipo == "validacion", f"Se esperaba que la busqueda sea rechazada por falta de fecha: tipo={tipo!r} mensaje={mensaje!r}"
+capturar_paso(app, "busqueda_rechazada_por_falta_de_fecha", paso_excel=4)
+# Mismo mensaje real que CP019 (rango incompleto): con un motivo
+# seleccionado, la Fecha inicial sigue siendo obligatoria vía el mismo
+# chequeo de "entre" sin los dos valores del rango - confirmado en vivo,
+# no existe un mensaje distinto especifico de "motivo sin fecha".
+assert "debe ingresar los dos valores del rango" in mensaje.lower(), f"Mensaje inesperado: {mensaje!r}"
 '''
-CUERPOS_REALES["CP019"] = f'''
-raise NotImplementedError("CP019 (RF-03 - Validacion de rango de fecha incompleto): {_MOTIVO_PENDIENTE_RF03}")
-'''
-CUERPOS_REALES["CP020"] = f'''
-raise NotImplementedError("CP020 (RF-03 - Validacion de fecha calendario invalida): {_MOTIVO_PENDIENTE_RF03}")
-'''
-CUERPOS_REALES["CP021"] = f'''
-raise NotImplementedError("CP021 (RF-03 - Fecha obligatoria al elegir el primer motivo de Procesos): {_MOTIVO_PENDIENTE_RF03}")
-'''
-CUERPOS_REALES["CP022"] = f'''
-raise NotImplementedError("CP022 (RF-03 - Limite de 15 dias activado al elegir un motivo): {_MOTIVO_PENDIENTE_RF03}")
+
+CUERPOS_REALES["CP022"] = '''
+app, frame = abrir_cortes_reconexiones(page, paso_excel=1)
+frame.locator("select").nth(0).select_option(index=1)
+fechas = frame.locator("input[type=date]")
+fechas.nth(0).fill("2026-01-01")
+fechas.nth(1).fill("2026-03-01")  # 59 dias, supera el limite de 15
+capturar_paso(app, "motivo_y_rango_mayor_a_15_dias", paso_excel=2)
+
+tipo, mensaje = leer_cortes_reconexiones(app, frame, aceptar_confirmacion=True)
+assert tipo == "validacion", f"Se esperaba la ventana de validacion del limite de 15 dias: tipo={tipo!r} mensaje={mensaje!r}"
+capturar_paso(app, "mensaje_limite_15_dias", paso_excel=4)
+assert "15 d" in mensaje.lower() and "máximo" in mensaje.lower(), f"Mensaje inesperado: {mensaje!r}"
+
+# El limite permanece vigente aunque se cambie de Tipo de Corte (RN
+# documentada en la matriz) - confirmado en vivo reintentando con el
+# MISMO rango de fechas tras pasar a "Verificaciones".
+frame.locator("input[type=radio]").nth(1).click(force=True)
+app.wait_for_timeout(1000)
+tipo2, mensaje2 = leer_cortes_reconexiones(app, frame, aceptar_confirmacion=True)
+capturar_paso(app, "limite_persiste_tras_cambiar_tipo_de_corte", paso_excel=4)
+assert tipo2 == "validacion" and "15 d" in mensaje2.lower(), (
+    f"El limite de 15 dias deberia seguir vigente tras cambiar el Tipo de Corte: tipo={tipo2!r} mensaje={mensaje2!r}"
+)
 '''
 
 CUERPOS_REALES["CP023"] = '''
@@ -497,8 +619,73 @@ capturar_paso(app, "consulta_ejecutada_sin_error", paso_excel=5)
 assert "error" not in texto_resultado.lower(), f"No se esperaba un error tras confirmar: {texto_resultado[-300:]!r}"
 '''
 
-CUERPOS_REALES["CP024"] = f'''
-raise NotImplementedError("CP024 (RF-03 - Guardar exporta con Tipo fijo, comportamiento heredado): {_MOTIVO_PENDIENTE_RF03}")
+CUERPOS_REALES["CP024"] = '''
+app, frame = abrir_cortes_reconexiones(page, paso_excel=1)
+frame.locator("input[type=radio]").nth(1).click(force=True)
+app.wait_for_timeout(500)
+fechas = frame.locator("input[type=date]")
+fechas.nth(0).fill("2000-01-01")
+fechas.nth(1).fill("2026-12-31")
+capturar_paso(app, "busqueda_con_verificaciones", paso_excel=1)
+
+tipo, mensaje = leer_cortes_reconexiones(app, frame, aceptar_confirmacion=True)
+assert tipo == "confirmacion", f"Se esperaba la confirmacion de 'sin filtro': tipo={tipo!r} mensaje={mensaje!r}"
+
+plazo = time.monotonic() + 90
+filas = 0
+while time.monotonic() < plazo:
+    filas = frame.locator("tr").count()
+    if filas > 0:
+        break
+    app.wait_for_timeout(2000)
+assert filas > 0, "No se cargo ningun resultado con 'Verificaciones' tras esperar hasta 90s"
+capturar_paso(app, "resultado_verificaciones_cargado", paso_excel=2)
+
+boton_guardar = frame.locator("button", has_text=re.compile(r"^\\s*Guardar como\\.\\.\\.\\s*$"))
+assert not boton_guardar.is_disabled(), "El boton 'Guardar como...' deberia estar habilitado con resultados en pantalla"
+capturar_paso(app, "antes_de_guardar", paso_excel=3)
+
+# DEFECTO REAL confirmado en vivo 28/10/2026 (reproducido 2/2 veces con
+# diagnostico de red): el backend (ExportarCortesReconexiones) responde
+# 200 OK con Content-Type text/plain, pero la ENTREGA del cuerpo de la
+# respuesta falla a mitad de camino con net::ERR_HTTP2_PROTOCOL_ERROR -
+# el navegador nunca llega a recibir el archivo completo, y recien ahi
+# (tras ~100s de espera real) la app muestra "Error de Servicio: Archivo
+# no se pudo guardar.". Por esto no se puede validar la regla original
+# del caso (si el Tipo exportado queda fijo en "Inconsistencias Corte
+# Fresco" pese a buscar con "Verificaciones"): la exportacion falla
+# ANTES de llegar a esa comparacion, con cualquier Tipo de Corte
+# seleccionado. Se deja tambien el camino de exito (descarga real) por
+# si el defecto se corrige mas adelante.
+_descarga = {"obj": None}
+app.on("download", lambda d: _descarga.__setitem__("obj", d))
+
+boton_guardar.click()
+
+modal = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile(".", re.S))
+plazo = time.monotonic() + 150
+while time.monotonic() < plazo:
+    if _descarga["obj"] is not None:
+        break
+    if modal.count() and modal.first.is_visible():
+        break
+    app.wait_for_timeout(2000)
+
+if _descarga["obj"] is not None:
+    destino = EVIDENCIA / f"{CASO}_export.csv"
+    _descarga["obj"].save_as(str(destino))
+    contenido = destino.read_text(encoding="latin-1", errors="replace")
+    capturar_paso(app, "descarga_exitosa", paso_excel=4)
+    assert "fresco" in contenido.lower() or "inconsistencia" in contenido.lower(), (
+        f"Se esperaba que el archivo exportado corresponda a 'Inconsistencias Corte Fresco' (Tipo fijo) "
+        f"independientemente de haber buscado con 'Verificaciones'. Primeros 300 caracteres: {contenido[:300]!r}"
+    )
+elif modal.count() and modal.first.is_visible():
+    texto_error = modal.first.inner_text()
+    capturar_paso(app, "defecto_real_archivo_no_se_pudo_guardar", paso_excel=4)
+    assert "no se pudo guardar" in texto_error.lower(), f"Mensaje de error inesperado: {texto_error!r}"
+else:
+    raise AssertionError("Tras 150s, 'Guardar como...' no produjo ni una descarga ni el modal de error conocido.")
 '''
 
 CUERPOS_REALES["CP025"] = '''

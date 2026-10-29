@@ -1585,7 +1585,72 @@ def main():
         _CASO_OK = False
         try:
             login(page)
-            raise NotImplementedError("CP024 (RF-03 - Guardar exporta con Tipo fijo, comportamiento heredado): backend confirmado operativo el 28/10/2026 (ya no da 504) - falta terminar la exploracion en vivo de esta validacion puntual. Ver _framework/modulos/consulta_cortes_reconexiones.py.")
+            app, frame = abrir_cortes_reconexiones(page, paso_excel=1)
+            frame.locator("input[type=radio]").nth(1).click(force=True)
+            app.wait_for_timeout(500)
+            fechas = frame.locator("input[type=date]")
+            fechas.nth(0).fill("2000-01-01")
+            fechas.nth(1).fill("2026-12-31")
+            capturar_paso(app, "busqueda_con_verificaciones", paso_excel=1)
+
+            tipo, mensaje = leer_cortes_reconexiones(app, frame, aceptar_confirmacion=True)
+            assert tipo == "confirmacion", f"Se esperaba la confirmacion de 'sin filtro': tipo={tipo!r} mensaje={mensaje!r}"
+
+            plazo = time.monotonic() + 90
+            filas = 0
+            while time.monotonic() < plazo:
+                filas = frame.locator("tr").count()
+                if filas > 0:
+                    break
+                app.wait_for_timeout(2000)
+            assert filas > 0, "No se cargo ningun resultado con 'Verificaciones' tras esperar hasta 90s"
+            capturar_paso(app, "resultado_verificaciones_cargado", paso_excel=2)
+
+            boton_guardar = frame.locator("button", has_text=re.compile(r"^\s*Guardar como\.\.\.\s*$"))
+            assert not boton_guardar.is_disabled(), "El boton 'Guardar como...' deberia estar habilitado con resultados en pantalla"
+            capturar_paso(app, "antes_de_guardar", paso_excel=3)
+
+            # DEFECTO REAL confirmado en vivo 28/10/2026 (reproducido 2/2 veces con
+            # diagnostico de red): el backend (ExportarCortesReconexiones) responde
+            # 200 OK con Content-Type text/plain, pero la ENTREGA del cuerpo de la
+            # respuesta falla a mitad de camino con net::ERR_HTTP2_PROTOCOL_ERROR -
+            # el navegador nunca llega a recibir el archivo completo, y recien ahi
+            # (tras ~100s de espera real) la app muestra "Error de Servicio: Archivo
+            # no se pudo guardar.". Por esto no se puede validar la regla original
+            # del caso (si el Tipo exportado queda fijo en "Inconsistencias Corte
+            # Fresco" pese a buscar con "Verificaciones"): la exportacion falla
+            # ANTES de llegar a esa comparacion, con cualquier Tipo de Corte
+            # seleccionado. Se deja tambien el camino de exito (descarga real) por
+            # si el defecto se corrige mas adelante.
+            _descarga = {"obj": None}
+            app.on("download", lambda d: _descarga.__setitem__("obj", d))
+
+            boton_guardar.click()
+
+            modal = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile(".", re.S))
+            plazo = time.monotonic() + 150
+            while time.monotonic() < plazo:
+                if _descarga["obj"] is not None:
+                    break
+                if modal.count() and modal.first.is_visible():
+                    break
+                app.wait_for_timeout(2000)
+
+            if _descarga["obj"] is not None:
+                destino = EVIDENCIA / f"{CASO}_export.csv"
+                _descarga["obj"].save_as(str(destino))
+                contenido = destino.read_text(encoding="latin-1", errors="replace")
+                capturar_paso(app, "descarga_exitosa", paso_excel=4)
+                assert "fresco" in contenido.lower() or "inconsistencia" in contenido.lower(), (
+                    f"Se esperaba que el archivo exportado corresponda a 'Inconsistencias Corte Fresco' (Tipo fijo) "
+                    f"independientemente de haber buscado con 'Verificaciones'. Primeros 300 caracteres: {contenido[:300]!r}"
+                )
+            elif modal.count() and modal.first.is_visible():
+                texto_error = modal.first.inner_text()
+                capturar_paso(app, "defecto_real_archivo_no_se_pudo_guardar", paso_excel=4)
+                assert "no se pudo guardar" in texto_error.lower(), f"Mensaje de error inesperado: {texto_error!r}"
+            else:
+                raise AssertionError("Tras 150s, 'Guardar como...' no produjo ni una descarga ni el modal de error conocido.")
 
             capturar_paso(app, "estado_final_del_caso", paso_excel=max(_parsear_pasos_excel(PASOS_CASO), default=None))
             _CASO_OK = True
