@@ -1313,6 +1313,45 @@ def limpiar_cortes_pendientes(app, frame):
 # **Validacion real confirmada**: presionar Leer con TODOS los filtros en
 # su estado por defecto (sin ningun filtro puesto) -> modal "Ventana de
 # Validación": *"Debe Seleccionar algún filtro para la consulta"*.
+#
+# **Campos de fecha reales (confirmado en vivo 29/10/2026): NI nativos
+# NI `nz-date-picker`** - son `<input type="text">` simples con
+# placeholder "dd/mm/aaaa" (`#fldFechaInicio`/`#fldFechaFin`, aparecen
+# recien al elegir "=" o "Entre" en el combo `fldTipoFecha`). Al ser
+# texto plano, SI se puede escribir una fecha de calendario inexistente
+# (ej. "31/02/2026") y el campo la acepta tal cual (a diferencia de los
+# `input[type=date]` nativos de RF-03/04/05, que la bloquean antes de
+# que llegue al formulario) - la app valida la fecha del lado del
+# backend y responde con el mensaje real de negocio.
+#
+# **Mensajes reales confirmados (29/10/2026)**:
+# - Fecha de calendario inexistente -> *"Fecha Inválida"*.
+# - Tipo de filtro elegido ("=" o "Entre") con Fecha inicial vacia ->
+#   *"Debe Seleccionar Rango Inferior de Fecha"*.
+# - "Entre" con Fecha inicial puesta pero Fecha final vacia ->
+#   *"Debe Seleccionar Rango Superior de Fecha"*.
+# - "Entre" con un rango mayor a 31 dias -> *"Error, Rango de Fechas Debe
+#   Ser Como Máximo 31 Días"*.
+#
+# **Seleccion de fila real**: no hay checkbox/radio por fila - un click
+# directo en cualquier parte de la fila la selecciona (resaltado celeste)
+# y habilita el boton "Anular". Dato real confirmado para busqueda con
+# resultados: Sucursal "1000 - Cañete" (sin mas filtro) trae 37
+# solicitudes reales, TODAS con `Estado Solicitud = "GENERADO"` (ninguna
+# "ANULADA" visible, confirma la regla de CP057 de solo mostrar
+# pendientes) y ordenadas ascendente por `Fecha Solicitud`.
+#
+# **Flujo de Anular confirmado en vivo**: seleccionar una fila (click) +
+# Anular -> modal "Confirmación" *"¿Desea continuar?"* -> al aceptar,
+# modal "Operación Exitosa" *"Solicitud de Reposición Anulada"*. Accion
+# REAL e IRREVERSIBLE sobre el dato (no hay boton para reactivar) - cada
+# corrida de un caso de Anular consume una solicitud real distinta.
+#
+# **Gotcha de grilla**: las filas de datos reales son `tr.ant-table-row`
+# - un `tr` suelto sin esa clase (o `table tr` a secas) trae de mas
+# filas vacias/placeholder, igual que el gotcha ya conocido de otras
+# `nz-table` de este proyecto (confirmar SIEMPRE `.ant-table-row` para
+# contar/leer filas reales de esta pantalla).
 # ============================================================================
 #
 
@@ -1630,7 +1669,59 @@ def main():
         _CASO_OK = False
         try:
             login(page)
-            raise NotImplementedError("CP057 (RF-08 - Busqueda exitosa de solicitudes pendientes): combos y backend confirmados operativos el 28/10/2026 (el 'combo roto' documentado el 28/09/2026 no se reproduce) - falta terminar la exploracion en vivo de esta validacion puntual. Ver _framework/modulos/consulta_solicitudes_reposicion_pendientes.py.")
+            app, frame = abrir_reposicion_pendientes(page, paso_excel=1)
+            elegir_nz_select(frame, app, "fldSucursal", "1000 - Cañete")
+            app.wait_for_timeout(500)
+            capturar_paso(app, "filtro_sucursal_aplicado", paso_excel=1)
+
+            frame.locator("button", has_text=re.compile(r"^\s*Leer\s*$")).click()
+            app.wait_for_timeout(2000)
+            modal = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile(".", re.S))
+            if modal.count() and modal.first.is_visible():
+                modal.first.get_by_role("button", name=re.compile("Aceptar", re.I)).click()
+                app.wait_for_timeout(2000)
+
+            esperar_fin_de_carga(app, frame)
+            encabezados = frame.locator("table thead th").all_text_contents()
+            idx_estado = encabezados.index("Estado Solicitud")
+            idx_fecha = encabezados.index("Fecha Solicitud")
+
+            # La grilla puede tardar en terminar de renderizar incluso despues de que
+            # "Cargando..." desaparece (mismo patron ya visto en otras pantallas de
+            # este proyecto) - se espera activamente a tener filas con el numero
+            # real de columnas, no solo a que exista algun <tr>.
+            plazo = time.monotonic() + 40
+            filas = frame.locator("tr.ant-table-row")
+            estados = []
+            fechas_solicitud = []
+            while time.monotonic() < plazo:
+                estados = []
+                fechas_solicitud = []
+                for i in range(filas.count()):
+                    celdas = filas.nth(i).locator("td").all_text_contents()
+                    if len(celdas) != len(encabezados):
+                        continue
+                    estados.append(celdas[idx_estado].strip())
+                    fechas_solicitud.append(celdas[idx_fecha].strip())
+                if estados:
+                    break
+                app.wait_for_timeout(1500)
+            capturar_paso(app, "resultado_solicitudes_pendientes", paso_excel=3)
+
+            assert estados, "No se pudieron leer los estados de las filas"
+            assert all(e != "ANULADO" and e != "ANULADA" for e in estados), (
+                f"Se esperaba que NINGUNA fila mostrara una solicitud anulada: {estados!r}"
+            )
+
+            fechas_dt = []
+            for f in fechas_solicitud:
+                if not f:
+                    continue
+                dd, mm, yyyy = f.split("/")
+                fechas_dt.append(date(int(yyyy), int(mm), int(dd)))
+            assert fechas_dt == sorted(fechas_dt), (
+                f"Se esperaba el resultado ordenado por Fecha Solicitud ascendente: {fechas_solicitud!r}"
+            )
 
             capturar_paso(app, "estado_final_del_caso", paso_excel=max(_parsear_pasos_excel(PASOS_CASO), default=None))
             _CASO_OK = True

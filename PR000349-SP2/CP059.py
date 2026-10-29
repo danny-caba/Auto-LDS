@@ -1313,6 +1313,45 @@ def limpiar_cortes_pendientes(app, frame):
 # **Validacion real confirmada**: presionar Leer con TODOS los filtros en
 # su estado por defecto (sin ningun filtro puesto) -> modal "Ventana de
 # Validación": *"Debe Seleccionar algún filtro para la consulta"*.
+#
+# **Campos de fecha reales (confirmado en vivo 29/10/2026): NI nativos
+# NI `nz-date-picker`** - son `<input type="text">` simples con
+# placeholder "dd/mm/aaaa" (`#fldFechaInicio`/`#fldFechaFin`, aparecen
+# recien al elegir "=" o "Entre" en el combo `fldTipoFecha`). Al ser
+# texto plano, SI se puede escribir una fecha de calendario inexistente
+# (ej. "31/02/2026") y el campo la acepta tal cual (a diferencia de los
+# `input[type=date]` nativos de RF-03/04/05, que la bloquean antes de
+# que llegue al formulario) - la app valida la fecha del lado del
+# backend y responde con el mensaje real de negocio.
+#
+# **Mensajes reales confirmados (29/10/2026)**:
+# - Fecha de calendario inexistente -> *"Fecha Inválida"*.
+# - Tipo de filtro elegido ("=" o "Entre") con Fecha inicial vacia ->
+#   *"Debe Seleccionar Rango Inferior de Fecha"*.
+# - "Entre" con Fecha inicial puesta pero Fecha final vacia ->
+#   *"Debe Seleccionar Rango Superior de Fecha"*.
+# - "Entre" con un rango mayor a 31 dias -> *"Error, Rango de Fechas Debe
+#   Ser Como Máximo 31 Días"*.
+#
+# **Seleccion de fila real**: no hay checkbox/radio por fila - un click
+# directo en cualquier parte de la fila la selecciona (resaltado celeste)
+# y habilita el boton "Anular". Dato real confirmado para busqueda con
+# resultados: Sucursal "1000 - Cañete" (sin mas filtro) trae 37
+# solicitudes reales, TODAS con `Estado Solicitud = "GENERADO"` (ninguna
+# "ANULADA" visible, confirma la regla de CP057 de solo mostrar
+# pendientes) y ordenadas ascendente por `Fecha Solicitud`.
+#
+# **Flujo de Anular confirmado en vivo**: seleccionar una fila (click) +
+# Anular -> modal "Confirmación" *"¿Desea continuar?"* -> al aceptar,
+# modal "Operación Exitosa" *"Solicitud de Reposición Anulada"*. Accion
+# REAL e IRREVERSIBLE sobre el dato (no hay boton para reactivar) - cada
+# corrida de un caso de Anular consume una solicitud real distinta.
+#
+# **Gotcha de grilla**: las filas de datos reales son `tr.ant-table-row`
+# - un `tr` suelto sin esa clase (o `table tr` a secas) trae de mas
+# filas vacias/placeholder, igual que el gotcha ya conocido de otras
+# `nz-table` de este proyecto (confirmar SIEMPRE `.ant-table-row` para
+# contar/leer filas reales de esta pantalla).
 # ============================================================================
 #
 
@@ -1630,7 +1669,14 @@ def main():
         _CASO_OK = False
         try:
             login(page)
-            raise NotImplementedError("CP059 (RF-08 - Rango inferior obligatorio no ingresado): combos y backend confirmados operativos el 28/10/2026 (el 'combo roto' documentado el 28/09/2026 no se reproduce) - falta terminar la exploracion en vivo de esta validacion puntual. Ver _framework/modulos/consulta_solicitudes_reposicion_pendientes.py.")
+            app, frame = abrir_reposicion_pendientes(page, paso_excel=1)
+            elegir_nz_select(frame, app, "fldTipoFecha", "=")
+            app.wait_for_timeout(500)
+            capturar_paso(app, "tipo_fecha_sin_fecha_inicial", paso_excel=1)
+
+            mensaje = leer_reposicion_pendientes(app, frame)
+            capturar_paso(app, "mensaje_rango_inferior_obligatorio", paso_excel=4)
+            assert mensaje is not None and "rango inferior" in mensaje.lower(), f"Mensaje inesperado: {mensaje!r}"
 
             capturar_paso(app, "estado_final_del_caso", paso_excel=max(_parsear_pasos_excel(PASOS_CASO), default=None))
             _CASO_OK = True

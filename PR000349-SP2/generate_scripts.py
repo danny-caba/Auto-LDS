@@ -1503,26 +1503,111 @@ _MOTIVO_BLOQUEO_RF09_FECHA = (
 # validacion puntual (busqueda con resultados reales, limites de rango,
 # Anular) - no alcanzo el tiempo en esta sesion.
 
-_MOTIVO_PENDIENTE_RF08 = (
-    "combos y backend confirmados operativos el 28/10/2026 (el 'combo roto' documentado el "
-    "28/09/2026 no se reproduce) - falta terminar la exploracion en vivo de esta validacion "
-    "puntual. Ver _framework/modulos/consulta_solicitudes_reposicion_pendientes.py."
+# CP057-061/063 escritos y confirmados en vivo 29/10/2026 (DCABA_DW) -
+# ver detalle de cada hallazgo en los comentarios de cada caso.
+
+CUERPOS_REALES["CP057"] = '''
+app, frame = abrir_reposicion_pendientes(page, paso_excel=1)
+elegir_nz_select(frame, app, "fldSucursal", "1000 - Cañete")
+app.wait_for_timeout(500)
+capturar_paso(app, "filtro_sucursal_aplicado", paso_excel=1)
+
+frame.locator("button", has_text=re.compile(r"^\\s*Leer\\s*$")).click()
+app.wait_for_timeout(2000)
+modal = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile(".", re.S))
+if modal.count() and modal.first.is_visible():
+    modal.first.get_by_role("button", name=re.compile("Aceptar", re.I)).click()
+    app.wait_for_timeout(2000)
+
+esperar_fin_de_carga(app, frame)
+encabezados = frame.locator("table thead th").all_text_contents()
+idx_estado = encabezados.index("Estado Solicitud")
+idx_fecha = encabezados.index("Fecha Solicitud")
+
+# La grilla puede tardar en terminar de renderizar incluso despues de que
+# "Cargando..." desaparece (mismo patron ya visto en otras pantallas de
+# este proyecto) - se espera activamente a tener filas con el numero
+# real de columnas, no solo a que exista algun <tr>.
+plazo = time.monotonic() + 40
+filas = frame.locator("tr.ant-table-row")
+estados = []
+fechas_solicitud = []
+while time.monotonic() < plazo:
+    estados = []
+    fechas_solicitud = []
+    for i in range(filas.count()):
+        celdas = filas.nth(i).locator("td").all_text_contents()
+        if len(celdas) != len(encabezados):
+            continue
+        estados.append(celdas[idx_estado].strip())
+        fechas_solicitud.append(celdas[idx_fecha].strip())
+    if estados:
+        break
+    app.wait_for_timeout(1500)
+capturar_paso(app, "resultado_solicitudes_pendientes", paso_excel=3)
+
+assert estados, "No se pudieron leer los estados de las filas"
+assert all(e != "ANULADO" and e != "ANULADA" for e in estados), (
+    f"Se esperaba que NINGUNA fila mostrara una solicitud anulada: {estados!r}"
 )
 
-CUERPOS_REALES["CP057"] = f'''
-raise NotImplementedError("CP057 (RF-08 - Busqueda exitosa de solicitudes pendientes): {_MOTIVO_PENDIENTE_RF08}")
+fechas_dt = []
+for f in fechas_solicitud:
+    if not f:
+        continue
+    dd, mm, yyyy = f.split("/")
+    fechas_dt.append(date(int(yyyy), int(mm), int(dd)))
+assert fechas_dt == sorted(fechas_dt), (
+    f"Se esperaba el resultado ordenado por Fecha Solicitud ascendente: {fechas_solicitud!r}"
+)
 '''
-CUERPOS_REALES["CP058"] = f'''
-raise NotImplementedError("CP058 (RF-08 - Validacion de fecha invalida): {_MOTIVO_PENDIENTE_RF08}")
+
+CUERPOS_REALES["CP058"] = '''
+app, frame = abrir_reposicion_pendientes(page, paso_excel=1)
+elegir_nz_select(frame, app, "fldTipoFecha", "=")
+app.wait_for_timeout(500)
+frame.locator("#fldFechaInicio").fill("31/02/2026")
+capturar_paso(app, "fecha_calendario_inexistente", paso_excel=1)
+
+mensaje = leer_reposicion_pendientes(app, frame)
+capturar_paso(app, "mensaje_fecha_invalida", paso_excel=3)
+assert mensaje is not None and "fecha inv" in mensaje.lower(), f"Mensaje inesperado: {mensaje!r}"
 '''
-CUERPOS_REALES["CP059"] = f'''
-raise NotImplementedError("CP059 (RF-08 - Rango inferior obligatorio no ingresado): {_MOTIVO_PENDIENTE_RF08}")
+
+CUERPOS_REALES["CP059"] = '''
+app, frame = abrir_reposicion_pendientes(page, paso_excel=1)
+elegir_nz_select(frame, app, "fldTipoFecha", "=")
+app.wait_for_timeout(500)
+capturar_paso(app, "tipo_fecha_sin_fecha_inicial", paso_excel=1)
+
+mensaje = leer_reposicion_pendientes(app, frame)
+capturar_paso(app, "mensaje_rango_inferior_obligatorio", paso_excel=4)
+assert mensaje is not None and "rango inferior" in mensaje.lower(), f"Mensaje inesperado: {mensaje!r}"
 '''
-CUERPOS_REALES["CP060"] = f'''
-raise NotImplementedError("CP060 (RF-08 - Rango superior obligatorio en filtro Entre): {_MOTIVO_PENDIENTE_RF08}")
+
+CUERPOS_REALES["CP060"] = '''
+app, frame = abrir_reposicion_pendientes(page, paso_excel=1)
+elegir_nz_select(frame, app, "fldTipoFecha", "Entre")
+app.wait_for_timeout(500)
+frame.locator("#fldFechaInicio").fill("01/06/2026")
+capturar_paso(app, "solo_fecha_inicial_sin_final", paso_excel=2)
+
+mensaje = leer_reposicion_pendientes(app, frame)
+capturar_paso(app, "mensaje_rango_superior_obligatorio", paso_excel=4)
+assert mensaje is not None and "rango superior" in mensaje.lower(), f"Mensaje inesperado: {mensaje!r}"
 '''
-CUERPOS_REALES["CP061"] = f'''
-raise NotImplementedError("CP061 (RF-08 - Rango de fechas, comportamiento configurable): {_MOTIVO_PENDIENTE_RF08}")
+
+CUERPOS_REALES["CP061"] = '''
+app, frame = abrir_reposicion_pendientes(page, paso_excel=1)
+elegir_nz_select(frame, app, "fldTipoFecha", "Entre")
+app.wait_for_timeout(500)
+frame.locator("#fldFechaInicio").fill("01/01/2026")
+frame.locator("#fldFechaFin").fill("15/03/2026")  # 73 dias, supera el maximo de 31
+capturar_paso(app, "rango_mayor_a_31_dias", paso_excel=2)
+
+mensaje = leer_reposicion_pendientes(app, frame)
+capturar_paso(app, "mensaje_limite_31_dias", paso_excel=4)
+assert mensaje is not None and "31" in mensaje and "d" in mensaje.lower(), f"Mensaje inesperado: {mensaje!r}"
 '''
 
 CUERPOS_REALES["CP062"] = '''
@@ -1536,8 +1621,61 @@ assert mensaje is not None and "filtro" in mensaje.lower() and "seleccionar" in 
 )
 '''
 
-CUERPOS_REALES["CP063"] = f'''
-raise NotImplementedError("CP063 (RF-08 - Anular exitoso): {_MOTIVO_PENDIENTE_RF08}")
+CUERPOS_REALES["CP063"] = '''
+app, frame = abrir_reposicion_pendientes(page, paso_excel=1)
+elegir_nz_select(frame, app, "fldSucursal", "1000 - Cañete")
+app.wait_for_timeout(500)
+
+frame.locator("button", has_text=re.compile(r"^\\s*Leer\\s*$")).click()
+app.wait_for_timeout(2000)
+modal = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile(".", re.S))
+if modal.count() and modal.first.is_visible():
+    modal.first.get_by_role("button", name=re.compile("Aceptar", re.I)).click()
+    app.wait_for_timeout(2000)
+
+esperar_fin_de_carga(app, frame)
+# La primera fila de `tr.ant-table-row` puede ser una fila estructural
+# vacia (sin <td>, confirmado en vivo) - hay que ubicar la primera fila
+# con celdas de datos reales, no asumir que es filas.first().
+plazo = time.monotonic() + 40
+filas = frame.locator("tr.ant-table-row")
+primera_fila = None
+while time.monotonic() < plazo:
+    for i in range(filas.count()):
+        candidata = filas.nth(i)
+        if candidata.locator("td").count() > 0:
+            primera_fila = candidata
+            break
+    if primera_fila is not None:
+        break
+    app.wait_for_timeout(1500)
+assert primera_fila is not None, "No se cargo ningun resultado real para seleccionar y anular"
+capturar_paso(app, "resultado_antes_de_seleccionar", paso_excel=1)
+
+boton_anular = frame.locator("button", has_text=re.compile(r"^\\s*Anular\\s*$"))
+assert boton_anular.is_disabled(), "Anular deberia iniciar deshabilitado sin ninguna fila seleccionada"
+
+numero_solicitud = primera_fila.locator("td").nth(14).inner_text().strip()
+primera_fila.click()
+app.wait_for_timeout(500)
+assert not boton_anular.is_disabled(), "Anular deberia habilitarse al seleccionar una fila pendiente"
+capturar_paso(app, "fila_seleccionada", paso_excel=1)
+
+boton_anular.click()
+app.wait_for_timeout(1500)
+modal2 = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile(".", re.S))
+assert modal2.count() and modal2.first.is_visible(), "Se esperaba la confirmacion antes de anular"
+mensaje_confirmacion = modal2.first.inner_text()
+assert "desea continuar" in mensaje_confirmacion.lower(), f"Mensaje de confirmacion inesperado: {mensaje_confirmacion!r}"
+capturar_paso(app, "confirmacion_desea_continuar", paso_excel=3)
+
+modal2.first.get_by_role("button", name=re.compile("S[ií]|Aceptar", re.I)).first.click()
+app.wait_for_timeout(2500)
+modal3 = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile(".", re.S))
+assert modal3.count() and modal3.first.is_visible(), f"Se esperaba el mensaje de exito tras anular la solicitud {numero_solicitud}"
+mensaje_final = modal3.first.inner_text()
+capturar_paso(app, "solicitud_anulada", paso_excel=4)
+assert "anulada" in mensaje_final.lower(), f"Mensaje final inesperado: {mensaje_final!r}"
 '''
 
 CUERPOS_REALES["CP064"] = f'''
