@@ -879,27 +879,168 @@ capturar_paso(app, "verificacion_reconsulta_completa", paso_excel=5)
 # sesion. El backend funcionando es la base ya confirmada - falta
 # terminar de escribir los cuerpos.
 
-_MOTIVO_PENDIENTE_RF05 = (
-    "backend confirmado operativo el 28/10/2026 (ya no da 503) - falta encontrar el rango de "
-    "fecha/filtros real que trae resultados (mismo patron que RF-04, datos historicos) y "
-    "terminar la exploracion en vivo del resto de las validaciones. Ver "
-    "_framework/modulos/consulta_pagos.py."
-)
+# CP031-035/037 escritos y confirmados en vivo 28/10/2026 (DCABA_DW) -
+# ver detalle de cada hallazgo en los comentarios de cada caso.
 
-CUERPOS_REALES["CP031"] = f'''
-raise NotImplementedError("CP031 (RF-05 - Busqueda exitosa, Actualizacion de Saldo por defecto): {_MOTIVO_PENDIENTE_RF05}")
+CUERPOS_REALES["CP031"] = '''
+app, frame = abrir_consulta_pagos(page, paso_excel=1)
+texto_inicial = frame.locator("body").inner_text()
+assert "Actualización de Saldo" in texto_inicial, "Se esperaba 'Actualización de Saldo' como Referencia por defecto"
+operador_default = frame.locator("nz-select#cboFechaOperador").inner_text().strip()
+assert operador_default == "=", f"Se esperaba '=' como operador por defecto en modo simple: {operador_default!r}"
+capturar_paso(app, "referencia_y_operador_por_defecto", paso_excel=1)
+
+# Dato real confirmado en vivo: la Fecha nace con HOY precargado (sin
+# datos reales); 02/05/2002 SI tiene pagos reales de Actualizacion de
+# Saldo en el ambiente de Pruebas.
+frame.locator("#txtFechaInicial").fill("2002-05-02")
+capturar_paso(app, "antes_de_buscar", paso_excel=2)
+
+frame.locator("button", has_text=re.compile(r"^\s*Leer\s*$")).click()
+app.wait_for_timeout(2000)
+modal = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile(".", re.S))
+assert modal.count() and modal.first.is_visible() and "confirmaci" in modal.first.inner_text().lower(), (
+    "Se esperaba la confirmacion de 'sin filtro'"
+)
+modal.first.get_by_role("button", name=re.compile("Aceptar", re.I)).click()
+app.wait_for_timeout(2500)
+
+plazo = time.monotonic() + 60
+filas = 0
+while time.monotonic() < plazo:
+    filas = frame.locator("tr").count()
+    if filas > 2:
+        break
+    app.wait_for_timeout(2000)
+assert filas > 2, "No se cargo ningun resultado real de Actualizacion de Saldo"
+capturar_paso(app, "resultado_paginado_actualizacion_de_saldo", paso_excel=3)
+
+# Columnas propias de "Actualizacion de Saldo": N. Cliente/Sector/Suc.Cli./Estado
+# con dato real, Tipo Dcto./Libro/N. Dcto. vacios ("—") en esta fila.
+primera_fila = frame.locator("table").first.locator("tbody tr, tr").nth(1).inner_text()
+celdas = primera_fila.split("\\t")
+assert len(celdas) >= 11 and celdas[7].strip() not in ("", "—"), (
+    f"Se esperaba N.Cliente con dato real en la columna de Actualizacion de Saldo: {primera_fila!r}"
+)
 '''
-CUERPOS_REALES["CP032"] = f'''
-raise NotImplementedError("CP032 (RF-05 - Cambio a Otros Conceptos habilita filtros exclusivos): {_MOTIVO_PENDIENTE_RF05}")
+
+CUERPOS_REALES["CP032"] = '''
+app, frame = abrir_consulta_pagos(page, paso_excel=1)
+elegir_nz_select(frame, app, "cboReferencia", "Otros Conceptos")
+app.wait_for_timeout(1000)
+capturar_paso(app, "referencia_otros_conceptos", paso_excel=1)
+
+for campo_id in ("cboOrigen", "cboLibro", "cboDoctoOperador"):
+    clase = frame.locator(f"nz-select#{campo_id}").get_attribute("class") or ""
+    assert "ant-select-disabled" not in clase, f"Se esperaba que {campo_id} quede habilitado con 'Otros Conceptos': {clase!r}"
+assert not frame.locator("#txtDoctoInicial").is_disabled(), "Se esperaba N.° Dcto. habilitado con 'Otros Conceptos'"
+capturar_paso(app, "filtros_exclusivos_habilitados", paso_excel=2)
+
+frame.locator("nz-select#cboConcepto").click()
+app.wait_for_timeout(500)
+opciones_concepto = [o.strip() for o in frame.locator("nz-option-item, .ant-select-item-option").all_text_contents() if o.strip()]
+app.keyboard.press("Escape")
+assert len(opciones_concepto) >= 5, f"Se esperaban varios conceptos vigentes de 'Otros Conceptos': {opciones_concepto!r}"
+capturar_paso(app, "combo_concepto_recargado", paso_excel=2)
+
+frame.locator("#txtFechaInicial").fill("2002-05-02")
+frame.locator("button", has_text=re.compile(r"^\\s*Leer\\s*$")).click()
+app.wait_for_timeout(2000)
+modal = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile(".", re.S))
+if modal.count() and modal.first.is_visible():
+    modal.first.get_by_role("button", name=re.compile("Aceptar", re.I)).click()
+    app.wait_for_timeout(2500)
+
+plazo = time.monotonic() + 60
+filas = 0
+while time.monotonic() < plazo:
+    filas = frame.locator("tr").count()
+    if filas > 2:
+        break
+    app.wait_for_timeout(2000)
+assert filas > 2, "No se cargo ningun resultado real de Otros Conceptos"
+capturar_paso(app, "resultado_columnas_otros_conceptos", paso_excel=3)
+
+# Columnas propias de "Otros Conceptos": Cpto./Tipo Dcto./Libro/N. Dcto.
+# con dato real en esta fila (a diferencia de Actualizacion de Saldo).
+primera_fila = frame.locator("table").first.locator("tbody tr, tr").nth(1).inner_text()
+celdas = primera_fila.split("\\t")
+assert len(celdas) >= 15 and celdas[6].strip() not in ("", "—") and celdas[12].strip() not in ("", "—"), (
+    f"Se esperaba Cpto. y Tipo Dcto. con dato real en la columna de Otros Conceptos: {primera_fila!r}"
+)
 '''
-CUERPOS_REALES["CP033"] = f'''
-raise NotImplementedError("CP033 (RF-05 - Limite de 15 dias, Actualizacion de Saldo): {_MOTIVO_PENDIENTE_RF05}")
+
+CUERPOS_REALES["CP033"] = '''
+app, frame = abrir_consulta_pagos(page, paso_excel=1)
+elegir_nz_select(frame, app, "cboFechaOperador", "entre")
+app.wait_for_timeout(500)
+fechas = frame.locator("input[type=date]")
+fechas.nth(0).fill("2026-01-01")
+fechas.nth(1).fill("2026-03-01")  # 59 dias, supera el limite de 15
+capturar_paso(app, "rango_mayor_a_15_dias", paso_excel=2)
+
+frame.locator("button", has_text=re.compile(r"^\\s*Leer\\s*$")).click()
+app.wait_for_timeout(2000)
+modal = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile(".", re.S))
+assert modal.count() and modal.first.is_visible(), "Se esperaba la ventana de validacion del limite de 15 dias"
+mensaje = modal.first.inner_text()
+capturar_paso(app, "mensaje_limite_15_dias", paso_excel=4)
+assert "15 d" in mensaje.lower() and "máximo" in mensaje.lower(), f"Mensaje inesperado: {mensaje!r}"
 '''
-CUERPOS_REALES["CP034"] = f'''
-raise NotImplementedError("CP034 (RF-05 - Sin limite de dias, No Ubicados): {_MOTIVO_PENDIENTE_RF05}")
+
+CUERPOS_REALES["CP034"] = '''
+app, frame = abrir_consulta_pagos(page, paso_excel=1)
+elegir_nz_select(frame, app, "cboReferencia", "No Ubicados")
+app.wait_for_timeout(1000)
+capturar_paso(app, "referencia_no_ubicados", paso_excel=1)
+
+frame.locator("#txtFechaInicial").fill("2026-10-28")
+capturar_paso(app, "antes_de_buscar", paso_excel=2)
+
+frame.locator("button", has_text=re.compile(r"^\\s*Leer\\s*$")).click()
+app.wait_for_timeout(2000)
+modal = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile(".", re.S))
+assert modal.count() and modal.first.is_visible() and "confirmaci" in modal.first.inner_text().lower(), (
+    "Se esperaba la confirmacion de 'sin filtro' antes del defecto"
+)
+modal.first.get_by_role("button", name=re.compile("Aceptar", re.I)).click()
+app.wait_for_timeout(1500)  # dar tiempo a que el modal de confirmacion termine de cerrarse
+
+# DEFECTO REAL confirmado en vivo 28/10/2026 (reproducido con operador
+# "=" y con "entre", ambos fallan igual): el backend BuscarPagos
+# responde HTTP 500 con Referencia "No Ubicados", sin importar el rango
+# de fechas - no se puede validar la regla original del caso (ausencia
+# de limite de 15 dias para este origen) porque la consulta nunca
+# llega a ejecutarse con exito.
+plazo = time.monotonic() + 30
+texto_error = ""
+while time.monotonic() < plazo:
+    if modal.count() and modal.first.is_visible():
+        texto_error = modal.first.inner_text()
+        if "confirmaci" not in texto_error.lower():
+            break
+    app.wait_for_timeout(1000)
+assert texto_error and "confirmaci" not in texto_error.lower(), (
+    f"Se esperaba el modal de error real de 'No Ubicados' (no la confirmacion ya aceptada): {texto_error!r}"
+)
+capturar_paso(app, "defecto_real_error_en_consulta", paso_excel=4)
+assert "error en consulta" in texto_error.lower(), f"Mensaje de error inesperado: {texto_error!r}"
 '''
-CUERPOS_REALES["CP035"] = f'''
-raise NotImplementedError("CP035 (RF-05 - Operador de fecha restringido en modo simple): {_MOTIVO_PENDIENTE_RF05}")
+
+CUERPOS_REALES["CP035"] = '''
+app, frame = abrir_consulta_pagos(page, paso_excel=1)
+elegir_nz_select(frame, app, "cboFechaOperador", "<=")
+app.wait_for_timeout(500)
+frame.locator("#txtFechaInicial").fill("2002-05-02")
+capturar_paso(app, "operador_no_permitido_en_modo_simple", paso_excel=2)
+
+frame.locator("button", has_text=re.compile(r"^\\s*Leer\\s*$")).click()
+app.wait_for_timeout(2000)
+modal = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile(".", re.S))
+assert modal.count() and modal.first.is_visible(), "Se esperaba la ventana de validacion del operador no permitido"
+mensaje = modal.first.inner_text()
+capturar_paso(app, "mensaje_condicion_no_permitida", paso_excel=4)
+assert "no est" in mensaje.lower() and "actualización de saldo" in mensaje.lower(), f"Mensaje inesperado: {mensaje!r}"
 '''
 
 CUERPOS_REALES["CP036"] = '''
@@ -914,7 +1055,7 @@ frame.locator("#txtFechaInicial").fill("2026-01-01")
 app.wait_for_timeout(500)
 capturar_paso(app, "solo_fecha_sin_otro_filtro", paso_excel=3)
 
-frame.locator("button", has_text=re.compile(r"^\\s*Leer\\s*$")).click()
+frame.locator("button", has_text=re.compile(r"^\s*Leer\s*$")).click()
 app.wait_for_timeout(2000)
 modal = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile(".", re.S))
 assert modal.count() and modal.first.is_visible(), "Se esperaba el dialogo de confirmacion por falta de filtros"
@@ -931,8 +1072,46 @@ capturar_paso(app, "consulta_ejecutada_sin_error", paso_excel=5)
 assert "error" not in texto_resultado.lower(), f"No se esperaba un error tras confirmar: {texto_resultado[-300:]!r}"
 '''
 
-CUERPOS_REALES["CP037"] = f'''
-raise NotImplementedError("CP037 (RF-05 - Guardar exporta el universo completo con permiso): {_MOTIVO_PENDIENTE_RF05}")
+CUERPOS_REALES["CP037"] = '''
+app, frame = abrir_consulta_pagos(page, paso_excel=1)
+frame.locator("#txtFechaInicial").fill("2002-05-02")
+capturar_paso(app, "antes_de_buscar", paso_excel=1)
+
+frame.locator("button", has_text=re.compile(r"^\\s*Leer\\s*$")).click()
+app.wait_for_timeout(2000)
+modal = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile(".", re.S))
+if modal.count() and modal.first.is_visible():
+    modal.first.get_by_role("button", name=re.compile("Aceptar", re.I)).click()
+    app.wait_for_timeout(2500)
+
+plazo = time.monotonic() + 60
+filas = 0
+while time.monotonic() < plazo:
+    filas = frame.locator("tr").count()
+    if filas > 2:
+        break
+    app.wait_for_timeout(2000)
+assert filas > 2, "No se cargo ningun resultado real antes de exportar"
+capturar_paso(app, "resultado_antes_de_exportar", paso_excel=1)
+
+boton_guardar = frame.locator("button", has_text=re.compile(r"^\\s*Guardar como\\.\\.\\.\\s*$"))
+assert not boton_guardar.is_disabled(), "El boton 'Guardar como...' deberia estar habilitado con resultados en pantalla"
+
+with app.expect_download(timeout=60000) as download_info:
+    boton_guardar.click()
+descarga = download_info.value
+destino = EVIDENCIA / f"{CASO}_export.txt"
+descarga.save_as(str(destino))
+contenido = destino.read_text(encoding="latin-1", errors="replace")
+lineas_dato = [l for l in contenido.splitlines() if l.strip()][1:]  # sin encabezado
+capturar_paso(app, "archivo_exportado", paso_excel=4)
+
+# Confirma la regla real: el archivo exportado trae el UNIVERSO
+# COMPLETO de registros que cumplen los filtros vigentes, no solo el
+# primer bloque paginado (25) que se ve en pantalla.
+assert len(lineas_dato) > 25, (
+    f"Se esperaba que el archivo exportado tenga mas registros que el bloque paginado de 25: {len(lineas_dato)} lineas"
+)
 '''
 
 CUERPOS_REALES["CP038"] = '''

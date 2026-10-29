@@ -963,15 +963,60 @@ def filas_cuadratura_sesion(frame):
 # filtros vigentes." + "Registros mostrados: 0 — se cargan bloques
 # adicionales de 25 al continuar leyendo" - con fecha desde 01/01/2026
 # sin mas filtro, 0 resultados (los datos reales de Pruebas pueden ser
-# historicos, igual que en RF-04, donde los datos reales eran de 2005 -
-# no se confirmo aun que rango de fecha SI trae resultados reales para
-# esta pantalla).
+# historicos, igual que en RF-04, donde los datos reales eran de 2005).
+#
+# **Dato real confirmado 28/10/2026 que destraba la busqueda**:
+# 02/05/2002 (operador "=") tiene pagos reales tanto en "Actualización de
+# Saldo" como en "Otros Conceptos" (concepto EMI). Fecha "Desde" nace con
+# el dia de HOY precargado (a diferencia de otras pantallas del proyecto,
+# que nacen vacias) - por eso buscar sin tocar la fecha da 0 resultados
+# reales, no es que la pantalla este rota.
+#
+# **Combos reales son `nz-select` (ant-design), NO `<select>` nativos**:
+# `cboReferencia` (5 opciones: Actualización de Saldo / Otros Conceptos /
+# No Ubicados / Encargos de Cobranza / Cobranza Externa), `cboFechaOperador`
+# (`=`/`<=`/`>=`/`entre`, "=" por defecto), `cboLote`, `cboOficinaCod`,
+# `cboOficinaNom`, `cboCajero`, `cboConcepto` (recarga segun Referencia:
+# con "Otros Conceptos" trae 6 codigos reales - AUS/CHD/CVW/EMI/ENQ/MGT),
+# `cboMontoOperador`, `cboSector`, `cboEstado`, `cboTipoDocumento`,
+# `cboLibro`, `cboDoctoOperador`, `cboOrigen` (estos ultimos 4
+# deshabilitados salvo con Referencia "Otros Conceptos" - confirma CP032).
+# Usar `elegir_nz_select()` (abajo) para elegir una opcion, nunca
+# `select_option()`.
+#
+# **DEFECTO REAL confirmado en vivo 28/10/2026 (CP034)**: con Referencia
+# "No Ubicados", el backend `BuscarPagos` responde **500** siempre
+# (probado con operador "=" + fecha de hoy, y con "entre" + rango de 59
+# dias - ambos fallan igual) - la app muestra "Error de Servicio: Error
+# en consulta.". No se pudo validar la regla de "sin limite de dias" de
+# este origen porque la consulta nunca llega a ejecutarse con exito.
+#
+# **`Limpiar` NO resetea el combo `cboFechaOperador`** a "=" - si una
+# corrida previa (en la misma sesion de navegador) dejo el operador en
+# otro valor, Limpiar lo deja como estaba. No afecta a los CPxxx.py
+# reales (cada uno abre una sesion nueva), pero es relevante si se
+# encadenan varias pruebas manuales en una sola sesion de exploracion.
 # ============================================================================
 #
 
 
 def abrir_consulta_pagos(page, paso_excel=None):
     return abrir_aplicacion(page, ["Comercial", "Consulta De Pagos"], "app-consulta-pago", paso_excel=paso_excel)
+
+
+def elegir_nz_select(frame, app, select_id, texto_opcion):
+    """Elige una opcion por su texto visible en un combo `nz-select`
+    (ant-design) - estos combos NO son un <select> nativo, por lo que
+    select_option() no sirve: hay que abrir el combo (click) y clickear
+    la opcion dentro del overlay que ng-zorro agrega al DOM del propio
+    frame (no al documento de nivel superior)."""
+    frame.locator(f"nz-select#{select_id}").click()
+    app.wait_for_timeout(400)
+    opcion = frame.locator("nz-option-item, .ant-select-item-option").filter(
+        has_text=re.compile(r"^\s*" + re.escape(texto_opcion) + r"\s*$")
+    )
+    opcion.first.click()
+    app.wait_for_timeout(300)
 
 
 def leer_pagos(app, frame):
@@ -1585,7 +1630,45 @@ def main():
         _CASO_OK = False
         try:
             login(page)
-            raise NotImplementedError("CP031 (RF-05 - Busqueda exitosa, Actualizacion de Saldo por defecto): backend confirmado operativo el 28/10/2026 (ya no da 503) - falta encontrar el rango de fecha/filtros real que trae resultados (mismo patron que RF-04, datos historicos) y terminar la exploracion en vivo del resto de las validaciones. Ver _framework/modulos/consulta_pagos.py.")
+            app, frame = abrir_consulta_pagos(page, paso_excel=1)
+            texto_inicial = frame.locator("body").inner_text()
+            assert "Actualización de Saldo" in texto_inicial, "Se esperaba 'Actualización de Saldo' como Referencia por defecto"
+            operador_default = frame.locator("nz-select#cboFechaOperador").inner_text().strip()
+            assert operador_default == "=", f"Se esperaba '=' como operador por defecto en modo simple: {operador_default!r}"
+            capturar_paso(app, "referencia_y_operador_por_defecto", paso_excel=1)
+
+            # Dato real confirmado en vivo: la Fecha nace con HOY precargado (sin
+            # datos reales); 02/05/2002 SI tiene pagos reales de Actualizacion de
+            # Saldo en el ambiente de Pruebas.
+            frame.locator("#txtFechaInicial").fill("2002-05-02")
+            capturar_paso(app, "antes_de_buscar", paso_excel=2)
+
+            frame.locator("button", has_text=re.compile(r"^\s*Leer\s*$")).click()
+            app.wait_for_timeout(2000)
+            modal = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile(".", re.S))
+            assert modal.count() and modal.first.is_visible() and "confirmaci" in modal.first.inner_text().lower(), (
+                "Se esperaba la confirmacion de 'sin filtro'"
+            )
+            modal.first.get_by_role("button", name=re.compile("Aceptar", re.I)).click()
+            app.wait_for_timeout(2500)
+
+            plazo = time.monotonic() + 60
+            filas = 0
+            while time.monotonic() < plazo:
+                filas = frame.locator("tr").count()
+                if filas > 2:
+                    break
+                app.wait_for_timeout(2000)
+            assert filas > 2, "No se cargo ningun resultado real de Actualizacion de Saldo"
+            capturar_paso(app, "resultado_paginado_actualizacion_de_saldo", paso_excel=3)
+
+            # Columnas propias de "Actualizacion de Saldo": N. Cliente/Sector/Suc.Cli./Estado
+            # con dato real, Tipo Dcto./Libro/N. Dcto. vacios ("—") en esta fila.
+            primera_fila = frame.locator("table").first.locator("tbody tr, tr").nth(1).inner_text()
+            celdas = primera_fila.split("\t")
+            assert len(celdas) >= 11 and celdas[7].strip() not in ("", "—"), (
+                f"Se esperaba N.Cliente con dato real en la columna de Actualizacion de Saldo: {primera_fila!r}"
+            )
 
             capturar_paso(app, "estado_final_del_caso", paso_excel=max(_parsear_pasos_excel(PASOS_CASO), default=None))
             _CASO_OK = True
