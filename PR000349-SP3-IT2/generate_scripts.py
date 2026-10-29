@@ -2379,15 +2379,128 @@ assert not campo_ruc.is_enabled(), "El campo RUC deberia quedar deshabilitado tr
 capturar_paso(app, "ruc_y_razon_social_cargados_ruc_bloqueado", paso_excel=2)
 '''
 
-# CP065/CP066 BLOQUEADOS: el boton "..." abre un modal "Busqueda de
-# Proveedor" real (#bp-ruc, #bp-razonsocial, boton Buscar, grilla "DOBLE
-# CLIC SELECCIONA") pero la busqueda devuelve "Sin resultados." para
-# CUALQUIER termino probado (3/3: razon social "S.A.C.", "PERU", RUC
-# "20") - incluso terminos que deberian matchear proveedores YA
-# visibles en la grilla principal. Catalogo de busqueda vacio/roto en
-# este ambiente - sin esto no se puede completar el flujo real de
-# CP065 (completar datos desde el catalogo) ni CP066 (registrar
-# proveedor nuevo eligiendolo del catalogo).
+# CP065/CP066 - H002 CONFIRMADO CORREGIDO (29/10/2026, validado en
+# vivo junto con el usuario): el boton "..." abre el modal "Busqueda de
+# Proveedor" real (#bp-ruc, #bp-razonsocial, boton Buscar en el indice
+# 1, grilla "DOBLE CLIC SELECCIONA" - la seleccion es por DOBLE CLIC,
+# no un click simple) y la busqueda YA filtra correctamente (antes
+# devolvia "Sin resultados." para cualquier termino). La fila vacia
+# para registro nuevo es la ULTIMA fila de la grilla de proveedores
+# (texto vacio, no literalmente "sin datos") - identificarla por
+# contenido vacio, no por indice fijo (la cantidad de proveedores reales
+# puede variar).
+
+CUERPOS_REALES["CP065"] = '''
+app, frame = abrir_rf08(page, paso_excel=1)
+app.wait_for_timeout(1500)
+
+tabla = frame.locator("table, nz-table").first
+filas = tabla.locator("tbody tr, tr.ant-table-row")
+fila_vacia = None
+for i in range(filas.count()):
+    if filas.nth(i).inner_text().strip() == "":
+        fila_vacia = filas.nth(i)
+        break
+assert fila_vacia is not None, "No se encontro la fila vacia para registro de proveedor nuevo"
+fila_vacia.click()
+app.wait_for_timeout(500)
+capturar_paso(app, "fila_vacia_seleccionada", paso_excel=1)
+
+frame.locator("button").nth(1).click(timeout=8000)
+modal = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile(".", re.S)).first
+modal.wait_for(state="visible", timeout=10000)
+assert modal.count() and modal.is_visible(), "Se esperaba el modal 'Busqueda de Proveedor'"
+capturar_paso(app, "modal_busqueda_proveedor_abierto", paso_excel=2)
+
+campo_razon = modal.locator("#bp-razonsocial")
+campo_razon.click()
+campo_razon.fill("APPLUS")  # dato real confirmado en el catalogo (el de la matriz, "Instalaciones y
+# Mantenimiento JR EIRL", no existe en este ambiente - mismo patron de dato
+# de prueba inexistente ya visto en CP032)
+app.wait_for_timeout(300)
+modal.locator("button").nth(1).click(timeout=8000)
+
+# La grilla puede mostrar brevemente el resultado de la busqueda SIN
+# filtro que dispara el modal al abrirse (carrera confirmada en vivo) -
+# en vez de contar filas totales, esperar directamente a que aparezca
+# la fila real buscada por su contenido.
+fila_applus = modal.locator("tbody tr, tr").filter(has_text=re.compile("APPLUS", re.I))
+fila_applus.first.wait_for(state="visible", timeout=15000)
+capturar_paso(app, "resultado_filtrado_por_razon_social", paso_excel=3)
+assert "20545868505" in fila_applus.first.inner_text(), (
+    f"Se esperaba el proveedor APPLUS NORCONTROL (20545868505): {fila_applus.first.inner_text()!r}"
+)
+fila_applus.first.dblclick()
+app.wait_for_timeout(1000)
+capturar_paso(app, "proveedor_seleccionado_doble_clic", paso_excel=4)
+
+campo_ruc = frame.locator("#ruc")
+campo_razon_social = frame.locator("#razonSocial")
+assert campo_ruc.input_value().strip() == "20545868505", f"Se esperaba el RUC 20545868505 cargado: {campo_ruc.input_value()!r}"
+assert "APPLUS" in campo_razon_social.input_value().upper(), f"Se esperaba la razon social de APPLUS cargada: {campo_razon_social.input_value()!r}"
+capturar_paso(app, "ruc_y_razon_social_completados_desde_catalogo", paso_excel=5)
+'''
+
+CUERPOS_REALES["CP066"] = '''
+# Dato real confirmado en vivo 29/10/2026 (mismo patron que CP065): el
+# RUC 20501122334 / "Redes y Cortes del Pacífico SAC" que sugiere la
+# matriz no existe en el catalogo de este ambiente, y la sucursal
+# vigente de esta cuenta es "3200 - La República" (no "0005" como dice
+# la matriz, dato de otro ambiente). Se uso en su lugar un proveedor
+# real del catalogo, confirmado NO asignado aun a la sucursal vigente:
+# RUC 20107953541 "1 2 DE SEGURIDAD S.A.C.".
+app, frame = abrir_rf08(page, paso_excel=1)
+app.wait_for_timeout(1500)
+
+tabla = frame.locator("table, nz-table").first
+filas_antes = tabla.locator("tbody tr, tr.ant-table-row")
+total_antes = sum(1 for i in range(filas_antes.count()) if filas_antes.nth(i).inner_text().strip() != "")
+capturar_paso(app, "grilla_antes_de_registrar", paso_excel=1)
+
+fila_vacia = None
+for i in range(filas_antes.count()):
+    if filas_antes.nth(i).inner_text().strip() == "":
+        fila_vacia = filas_antes.nth(i)
+        break
+assert fila_vacia is not None, "No se encontro la fila vacia para registro de proveedor nuevo"
+fila_vacia.click()
+app.wait_for_timeout(500)
+
+frame.locator("button").nth(1).click(timeout=8000)
+modal = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile(".", re.S)).first
+modal.wait_for(state="visible", timeout=10000)
+capturar_paso(app, "modal_busqueda_proveedor_abierto", paso_excel=2)
+
+campo_ruc_modal = modal.locator("#bp-ruc")
+campo_ruc_modal.click()
+campo_ruc_modal.fill("20107953541")
+app.wait_for_timeout(300)
+modal.locator("button").nth(1).click(timeout=8000)
+
+fila_candidata = modal.locator("tbody tr, tr").filter(has_text=re.compile("20107953541"))
+fila_candidata.first.wait_for(state="visible", timeout=15000)
+capturar_paso(app, "proveedor_encontrado_en_catalogo", paso_excel=3)
+fila_candidata.first.dblclick()
+app.wait_for_timeout(1000)
+
+campo_ruc = frame.locator("#ruc")
+campo_razon_social = frame.locator("#razonSocial")
+assert campo_ruc.input_value().strip() == "20107953541", f"Se esperaba el RUC 20107953541 cargado: {campo_ruc.input_value()!r}"
+assert "SEGURIDAD" in campo_razon_social.input_value().upper(), f"Se esperaba la razon social cargada: {campo_razon_social.input_value()!r}"
+capturar_paso(app, "ruc_y_razon_social_completados", paso_excel=3)
+
+boton_registrar = frame.locator("button").nth(2)
+boton_registrar.click(timeout=8000)
+app.wait_for_timeout(2000)
+
+tabla2 = frame.locator("table, nz-table").first
+fila_nueva = tabla2.locator("tbody tr, tr.ant-table-row").filter(has_text=re.compile("20107953541"))
+fila_nueva.first.wait_for(state="visible", timeout=15000)
+capturar_paso(app, "proveedor_nuevo_visible_en_grilla", paso_excel=5)
+assert "SEGURIDAD" in fila_nueva.first.inner_text().upper(), (
+    f"Se esperaba el proveedor registrado en la grilla: {fila_nueva.first.inner_text()!r}"
+)
+'''
 
 CUERPOS_REALES["CP067"] = '''
 app, frame = abrir_rf08(page, paso_excel=1)
@@ -2467,17 +2580,83 @@ assert filas_reales(tabla_final).filter(has_text="20385784644").count() == 1, (
 capturar_paso(app, "proveedor_permanece_en_la_grilla", paso_excel=3)
 '''
 
-# CP069 PENDIENTE: probados 20101087566 (BUREAU VERITAS) y 20545868505
-# (APPLUS, el proveedor mas reciente) - AMBOS tienen dependencias
-# reales (sectores agendados). 20206018411 (TECSUR) y 20547132158
-# (DOMINIONPERU) SI se confirmaron sin dependencias (se eliminaron
-# limpio durante la exploracion, ver explore_27_rf8_eliminar.py) pero
-# ya fueron consumidos - no quedan en la grilla para escribir un
-# CPxxx.py repetible contra ellos. Solo queda sin probar 20331898008
-# (LUZ DEL SUR S.A.A., nombre institucional, no se intento por
-# prudencia) y el flujo de registrar un proveedor nuevo propio para
-# despues eliminarlo (bloqueado por el catalogo de busqueda roto, ver
-# nota de CP065/066 mas arriba). Pendiente de decidir con el usuario.
+# CP069 RESUELTO 29/10/2026: el flujo que esta nota dejaba pendiente
+# ("registrar un proveedor nuevo propio para despues eliminarlo") ya no
+# esta bloqueado (H002 corregido, ver CP065/066). El caso REGISTRA SU
+# PROPIO proveedor descartable al inicio y lo elimina en el mismo
+# cuerpo - autonomo, sin depender de que CP066 haya corrido antes (y
+# sin dejar a CP066 "gastado" para otro caso futuro). RUC usado:
+# 20490892363 "220 INVERSIONES E.I.R.L." (confirmado sin asignar a la
+# sucursal vigente antes de registrarlo).
+
+CUERPOS_REALES["CP069"] = '''
+app, frame = abrir_rf08(page, paso_excel=1)
+app.wait_for_timeout(1500)
+
+# Registrar primero un proveedor propio descartable (garantiza 0
+# dependencias, al ser un alta nueva de esta misma corrida) en vez de
+# depender de que CP066 haya corrido antes.
+RUC_DESCARTABLE = "20490892363"
+tabla = frame.locator("table, nz-table").first
+filas_iniciales = tabla.locator("tbody tr, tr.ant-table-row")
+fila_vacia = None
+for i in range(filas_iniciales.count()):
+    if filas_iniciales.nth(i).inner_text().strip() == "":
+        fila_vacia = filas_iniciales.nth(i)
+        break
+assert fila_vacia is not None, "No se encontro la fila vacia para registrar el proveedor descartable"
+fila_vacia.click()
+app.wait_for_timeout(500)
+
+frame.locator("button").nth(1).click(timeout=8000)
+modal_busqueda = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile(".", re.S)).first
+modal_busqueda.wait_for(state="visible", timeout=10000)
+campo_ruc_modal = modal_busqueda.locator("#bp-ruc")
+campo_ruc_modal.click()
+campo_ruc_modal.fill(RUC_DESCARTABLE)
+app.wait_for_timeout(300)
+modal_busqueda.locator("button").nth(1).click(timeout=8000)
+fila_candidata = modal_busqueda.locator("tbody tr, tr").filter(has_text=re.compile(RUC_DESCARTABLE))
+fila_candidata.first.wait_for(state="visible", timeout=15000)
+fila_candidata.first.dblclick()
+app.wait_for_timeout(1000)
+
+boton_registrar = frame.locator("button").nth(2)
+boton_registrar.click(timeout=8000)
+tabla_tras_alta = frame.locator("table, nz-table").first
+fila_descartable = filas_reales(tabla_tras_alta).filter(has_text=RUC_DESCARTABLE)
+fila_descartable.first.wait_for(state="visible", timeout=15000)
+capturar_paso(app, "proveedor_descartable_registrado", paso_excel=1)
+
+fila_objetivo = fila_descartable.first
+fila_objetivo.click()
+app.wait_for_timeout(1000)
+capturar_paso(app, "proveedor_sin_dependencias_seleccionado", paso_excel=1)
+
+boton_trash = frame.locator("button").nth(3)
+boton_trash.click()
+app.wait_for_timeout(1200)
+modal_confirmacion = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile(".", re.S)).first
+assert modal_confirmacion.count() > 0, "Se esperaba el dialogo de confirmacion antes de eliminar"
+capturar_paso(app, "confirmacion_de_eliminacion", paso_excel=2)
+modal_confirmacion.get_by_role("button", name=re.compile(r"^\\s*Aceptar\\s*$", re.I)).click()
+capturar_paso(app, "proveedor_eliminado", paso_excel=3)
+
+# La grilla puede tardar en terminar de refrescarse tras confirmar
+# (mismo patron de carrera ya visto en otras pantallas de este
+# proyecto) - esperar activamente a que la fila desaparezca de verdad.
+tabla_final = frame.locator("table, nz-table").first
+fila_eliminada = filas_reales(tabla_final).filter(has_text=RUC_DESCARTABLE)
+plazo = time.monotonic() + 15
+while time.monotonic() < plazo:
+    if fila_eliminada.count() == 0:
+        break
+    app.wait_for_timeout(500)
+capturar_paso(app, "proveedor_ya_no_aparece_en_grilla", paso_excel=4)
+assert fila_eliminada.count() == 0, (
+    "El proveedor deberia haberse retirado de la grilla tras confirmar la eliminacion"
+)
+'''
 
 # RF-3 (continuacion): CP022/023/024 confirmados en vivo 22/10/2026.
 # Inspeccion=N -> Dias de Inspeccion se fija en "0" y queda deshabilitado

@@ -851,7 +851,54 @@ def main():
         _CASO_OK = False
         try:
             login(page, paso_excel=1)
-            raise NotImplementedError('CP065 (RF-8 - Búsqueda de proveedor en catálogo completa los datos): falta escribir el body real - falta exploracion en vivo.')
+            app, frame = abrir_rf08(page, paso_excel=1)
+            app.wait_for_timeout(1500)
+
+            tabla = frame.locator("table, nz-table").first
+            filas = tabla.locator("tbody tr, tr.ant-table-row")
+            fila_vacia = None
+            for i in range(filas.count()):
+                if filas.nth(i).inner_text().strip() == "":
+                    fila_vacia = filas.nth(i)
+                    break
+            assert fila_vacia is not None, "No se encontro la fila vacia para registro de proveedor nuevo"
+            fila_vacia.click()
+            app.wait_for_timeout(500)
+            capturar_paso(app, "fila_vacia_seleccionada", paso_excel=1)
+
+            frame.locator("button").nth(1).click(timeout=8000)
+            modal = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile(".", re.S)).first
+            modal.wait_for(state="visible", timeout=10000)
+            assert modal.count() and modal.is_visible(), "Se esperaba el modal 'Busqueda de Proveedor'"
+            capturar_paso(app, "modal_busqueda_proveedor_abierto", paso_excel=2)
+
+            campo_razon = modal.locator("#bp-razonsocial")
+            campo_razon.click()
+            campo_razon.fill("APPLUS")  # dato real confirmado en el catalogo (el de la matriz, "Instalaciones y
+            # Mantenimiento JR EIRL", no existe en este ambiente - mismo patron de dato
+            # de prueba inexistente ya visto en CP032)
+            app.wait_for_timeout(300)
+            modal.locator("button").nth(1).click(timeout=8000)
+
+            # La grilla puede mostrar brevemente el resultado de la busqueda SIN
+            # filtro que dispara el modal al abrirse (carrera confirmada en vivo) -
+            # en vez de contar filas totales, esperar directamente a que aparezca
+            # la fila real buscada por su contenido.
+            fila_applus = modal.locator("tbody tr, tr").filter(has_text=re.compile("APPLUS", re.I))
+            fila_applus.first.wait_for(state="visible", timeout=15000)
+            capturar_paso(app, "resultado_filtrado_por_razon_social", paso_excel=3)
+            assert "20545868505" in fila_applus.first.inner_text(), (
+                f"Se esperaba el proveedor APPLUS NORCONTROL (20545868505): {fila_applus.first.inner_text()!r}"
+            )
+            fila_applus.first.dblclick()
+            app.wait_for_timeout(1000)
+            capturar_paso(app, "proveedor_seleccionado_doble_clic", paso_excel=4)
+
+            campo_ruc = frame.locator("#ruc")
+            campo_razon_social = frame.locator("#razonSocial")
+            assert campo_ruc.input_value().strip() == "20545868505", f"Se esperaba el RUC 20545868505 cargado: {campo_ruc.input_value()!r}"
+            assert "APPLUS" in campo_razon_social.input_value().upper(), f"Se esperaba la razon social de APPLUS cargada: {campo_razon_social.input_value()!r}"
+            capturar_paso(app, "ruc_y_razon_social_completados_desde_catalogo", paso_excel=5)
 
             capturar_paso(app, "estado_final_del_caso", paso_excel=max(_parsear_pasos_excel(PASOS_CASO), default=None))
             _CASO_OK = True

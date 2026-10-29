@@ -851,7 +851,64 @@ def main():
         _CASO_OK = False
         try:
             login(page, paso_excel=1)
-            raise NotImplementedError('CP066 (RF-8 - Registro de proveedor nuevo exitoso): falta escribir el body real - falta exploracion en vivo.')
+            # Dato real confirmado en vivo 29/10/2026 (mismo patron que CP065): el
+            # RUC 20501122334 / "Redes y Cortes del Pacífico SAC" que sugiere la
+            # matriz no existe en el catalogo de este ambiente, y la sucursal
+            # vigente de esta cuenta es "3200 - La República" (no "0005" como dice
+            # la matriz, dato de otro ambiente). Se uso en su lugar un proveedor
+            # real del catalogo, confirmado NO asignado aun a la sucursal vigente:
+            # RUC 20107953541 "1 2 DE SEGURIDAD S.A.C.".
+            app, frame = abrir_rf08(page, paso_excel=1)
+            app.wait_for_timeout(1500)
+
+            tabla = frame.locator("table, nz-table").first
+            filas_antes = tabla.locator("tbody tr, tr.ant-table-row")
+            total_antes = sum(1 for i in range(filas_antes.count()) if filas_antes.nth(i).inner_text().strip() != "")
+            capturar_paso(app, "grilla_antes_de_registrar", paso_excel=1)
+
+            fila_vacia = None
+            for i in range(filas_antes.count()):
+                if filas_antes.nth(i).inner_text().strip() == "":
+                    fila_vacia = filas_antes.nth(i)
+                    break
+            assert fila_vacia is not None, "No se encontro la fila vacia para registro de proveedor nuevo"
+            fila_vacia.click()
+            app.wait_for_timeout(500)
+
+            frame.locator("button").nth(1).click(timeout=8000)
+            modal = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile(".", re.S)).first
+            modal.wait_for(state="visible", timeout=10000)
+            capturar_paso(app, "modal_busqueda_proveedor_abierto", paso_excel=2)
+
+            campo_ruc_modal = modal.locator("#bp-ruc")
+            campo_ruc_modal.click()
+            campo_ruc_modal.fill("20107953541")
+            app.wait_for_timeout(300)
+            modal.locator("button").nth(1).click(timeout=8000)
+
+            fila_candidata = modal.locator("tbody tr, tr").filter(has_text=re.compile("20107953541"))
+            fila_candidata.first.wait_for(state="visible", timeout=15000)
+            capturar_paso(app, "proveedor_encontrado_en_catalogo", paso_excel=3)
+            fila_candidata.first.dblclick()
+            app.wait_for_timeout(1000)
+
+            campo_ruc = frame.locator("#ruc")
+            campo_razon_social = frame.locator("#razonSocial")
+            assert campo_ruc.input_value().strip() == "20107953541", f"Se esperaba el RUC 20107953541 cargado: {campo_ruc.input_value()!r}"
+            assert "SEGURIDAD" in campo_razon_social.input_value().upper(), f"Se esperaba la razon social cargada: {campo_razon_social.input_value()!r}"
+            capturar_paso(app, "ruc_y_razon_social_completados", paso_excel=3)
+
+            boton_registrar = frame.locator("button").nth(2)
+            boton_registrar.click(timeout=8000)
+            app.wait_for_timeout(2000)
+
+            tabla2 = frame.locator("table, nz-table").first
+            fila_nueva = tabla2.locator("tbody tr, tr.ant-table-row").filter(has_text=re.compile("20107953541"))
+            fila_nueva.first.wait_for(state="visible", timeout=15000)
+            capturar_paso(app, "proveedor_nuevo_visible_en_grilla", paso_excel=5)
+            assert "SEGURIDAD" in fila_nueva.first.inner_text().upper(), (
+                f"Se esperaba el proveedor registrado en la grilla: {fila_nueva.first.inner_text()!r}"
+            )
 
             capturar_paso(app, "estado_final_del_caso", paso_excel=max(_parsear_pasos_excel(PASOS_CASO), default=None))
             _CASO_OK = True

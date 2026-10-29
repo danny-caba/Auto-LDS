@@ -851,7 +851,72 @@ def main():
         _CASO_OK = False
         try:
             login(page, paso_excel=1)
-            raise NotImplementedError('CP069 (RF-8 - Eliminación exitosa de proveedor sin dependencias): falta escribir el body real - falta exploracion en vivo.')
+            app, frame = abrir_rf08(page, paso_excel=1)
+            app.wait_for_timeout(1500)
+
+            # Registrar primero un proveedor propio descartable (garantiza 0
+            # dependencias, al ser un alta nueva de esta misma corrida) en vez de
+            # depender de que CP066 haya corrido antes.
+            RUC_DESCARTABLE = "20490892363"
+            tabla = frame.locator("table, nz-table").first
+            filas_iniciales = tabla.locator("tbody tr, tr.ant-table-row")
+            fila_vacia = None
+            for i in range(filas_iniciales.count()):
+                if filas_iniciales.nth(i).inner_text().strip() == "":
+                    fila_vacia = filas_iniciales.nth(i)
+                    break
+            assert fila_vacia is not None, "No se encontro la fila vacia para registrar el proveedor descartable"
+            fila_vacia.click()
+            app.wait_for_timeout(500)
+
+            frame.locator("button").nth(1).click(timeout=8000)
+            modal_busqueda = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile(".", re.S)).first
+            modal_busqueda.wait_for(state="visible", timeout=10000)
+            campo_ruc_modal = modal_busqueda.locator("#bp-ruc")
+            campo_ruc_modal.click()
+            campo_ruc_modal.fill(RUC_DESCARTABLE)
+            app.wait_for_timeout(300)
+            modal_busqueda.locator("button").nth(1).click(timeout=8000)
+            fila_candidata = modal_busqueda.locator("tbody tr, tr").filter(has_text=re.compile(RUC_DESCARTABLE))
+            fila_candidata.first.wait_for(state="visible", timeout=15000)
+            fila_candidata.first.dblclick()
+            app.wait_for_timeout(1000)
+
+            boton_registrar = frame.locator("button").nth(2)
+            boton_registrar.click(timeout=8000)
+            tabla_tras_alta = frame.locator("table, nz-table").first
+            fila_descartable = filas_reales(tabla_tras_alta).filter(has_text=RUC_DESCARTABLE)
+            fila_descartable.first.wait_for(state="visible", timeout=15000)
+            capturar_paso(app, "proveedor_descartable_registrado", paso_excel=1)
+
+            fila_objetivo = fila_descartable.first
+            fila_objetivo.click()
+            app.wait_for_timeout(1000)
+            capturar_paso(app, "proveedor_sin_dependencias_seleccionado", paso_excel=1)
+
+            boton_trash = frame.locator("button").nth(3)
+            boton_trash.click()
+            app.wait_for_timeout(1200)
+            modal_confirmacion = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile(".", re.S)).first
+            assert modal_confirmacion.count() > 0, "Se esperaba el dialogo de confirmacion antes de eliminar"
+            capturar_paso(app, "confirmacion_de_eliminacion", paso_excel=2)
+            modal_confirmacion.get_by_role("button", name=re.compile(r"^\s*Aceptar\s*$", re.I)).click()
+            capturar_paso(app, "proveedor_eliminado", paso_excel=3)
+
+            # La grilla puede tardar en terminar de refrescarse tras confirmar
+            # (mismo patron de carrera ya visto en otras pantallas de este
+            # proyecto) - esperar activamente a que la fila desaparezca de verdad.
+            tabla_final = frame.locator("table, nz-table").first
+            fila_eliminada = filas_reales(tabla_final).filter(has_text=RUC_DESCARTABLE)
+            plazo = time.monotonic() + 15
+            while time.monotonic() < plazo:
+                if fila_eliminada.count() == 0:
+                    break
+                app.wait_for_timeout(500)
+            capturar_paso(app, "proveedor_ya_no_aparece_en_grilla", paso_excel=4)
+            assert fila_eliminada.count() == 0, (
+                "El proveedor deberia haberse retirado de la grilla tras confirmar la eliminacion"
+            )
 
             capturar_paso(app, "estado_final_del_caso", paso_excel=max(_parsear_pasos_excel(PASOS_CASO), default=None))
             _CASO_OK = True
