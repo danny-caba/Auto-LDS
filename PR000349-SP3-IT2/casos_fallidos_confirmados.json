@@ -1,0 +1,36 @@
+{
+  "CP032": {
+    "motivo": "DEFECTO REAL: al registrar una Accion Realizada de Corte NUEVA (pantalla 'Mantenedor de Accion Realizada de Corte', RF-4) con el indicador 'Corta' marcado (que por la regla RN confirmada en CP031 marca tambien 'Ubicado' automaticamente), el sistema muestra 'Error de Servicio: Error al registrar la accion de corte.' y el codigo nunca queda creado. Reproducido 3/4 veces en intentos separados en el tiempo dentro de la misma sesion (22/10/2026), con el modal de error real capturado explicitamente las 3 primeras veces; un 4to intento diagnostico no logro capturar el modal pero se confirmo por separado que el codigo '25' sigue sin existir tras ese intento tambien (4/4 fallos reales de creacion). Modificar y Eliminar sobre codigos EXISTENTES (CP033/CP034) funcionan correctamente - el defecto parece acotado especificamente al flujo de CREAR un codigo nuevo con Corta=Si.",
+    "fecha_verificacion": "2026-10-22",
+    "evidencia": "run_all.py --solo CP032 corrido 3 veces en momentos separados de la sesion, las 3 con 'Error de Servicio: Error al registrar la accion de corte.' capturado en CP032_error.png. Verificado por separado (_exploracion/explore_32_rf4_verificar_25.py) que el codigo 25 nunca llego a existir en el catalogo tras ningun intento (Leer 25 -> Descripcion vacia, boton sigue siendo 'Ingresar' no 'Modificar')."
+  },
+  "CP003": {
+    "motivo": "DEFECTO REAL (H001): con el permiso de lectura retirado sobre el recurso de Areas Zonales, el sistema SI deniega el acceso correctamente (la pantalla no carga el formulario ni las combinaciones) - pero la peticion real ObtenerCargaInicial responde con HTTP 400 Bad Request en vez de 401 Unauthorized o 403 Forbidden (los codigos semanticamente correctos para falta de permiso). El cuerpo de la respuesta SI trae el mensaje correcto ('Acceso denegado al recurso.'), pero el frontend no lo muestra al usuario - lo tapa con un dialogo generico 'Error de Servicio: Error al cargar las Areas Zonales y los Sectores.'. Reportar a Desarrollo: cambiar el codigo de estado HTTP de 400 a 401/403.",
+    "defecto_id": "H001",
+    "fecha_verificacion": "2026-10-26",
+    "evidencia": "run_all.py --solo CP003 --video, con video y Word generados. Peticion real capturada: POST https://tk0s-web.luzdelsur.com.pe/comercial/administra/administra/areazonal/web/api/areazonal/ObtenerCargaInicial -> HTTP 400, cuerpo {\"statusCode\":400,\"mensaje\":\"Acceso denegado al recurso.\",\"detalle\":\"Acceso denegado al recurso.\"}."
+  },
+  "CP065": {
+    "motivo": "DEFECTO REAL (H002): el boton '...' de busqueda de proveedor en catalogo (RF-8, Mantenimiento de Proveedores de Corte) abre correctamente el modal 'Busqueda de Proveedor' siguiendo el flujo exacto del manual de usuario (sin fila seleccionada, boton habilitado, campos #bp-ruc/#bp-razonsocial correctos), pero la busqueda devuelve 'Sin resultados.' incluso con el RUC EXACTO de un proveedor visible en la misma grilla un segundo antes (20545868505, APPLUS NORCONTROL PERU S.A.C.). Probado tambien con razon social parcial ('PERU') y RUC parcial ('20'), mismo resultado. El catalogo de busqueda parece desconectado de los datos reales de proveedores (mismo patron de 'fuente de datos desalineada' ya visto en RF-12 de PR000349-SP1). Reportar a Desarrollo/Infraestructura.",
+    "defecto_id": "H002",
+    "fecha_verificacion": "2026-10-26",
+    "evidencia": "_exploracion/validar_catalogo_manual6.py y validar_catalogo_manual7.py: busqueda por razon social 'PERU', RUC parcial '20', y RUC EXACTO '20545868505' (visible en la grilla principal) - las 3 devuelven 'Sin resultados.' en el modal."
+  },
+  "CP066": {
+    "motivo": "BLOQUEADO por el mismo defecto H002 (ver CP065): el flujo de 'Registro de proveedor nuevo exitoso' depende de completar los datos via el catalogo de busqueda, que esta roto. No se puede completar el caso hasta que H002 se corrija.",
+    "defecto_id": "H002",
+    "fecha_verificacion": "2026-10-26"
+  },
+  "CP061": {
+    "motivo": "BLOQUEADO - falta de cuenta/rol: requiere un usuario con alcance multi-sucursal (selector de Sucursal visible) para RF-8. La cuenta de prueba disponible (DCABA_DW) solo tiene alcance de sucursal unica (texto fijo '3200 - La Republica', sin selector). No es un defecto de la aplicacion.",
+    "fecha_verificacion": "2026-10-26"
+  },
+  "CP063": {
+    "motivo": "BLOQUEADO - mismo motivo que CP061: requiere alcance multi-sucursal para probar que el cambio de sucursal recarga la grilla. La cuenta de prueba disponible no tiene ese alcance.",
+    "fecha_verificacion": "2026-10-26"
+  },
+  "CP069": {
+    "motivo": "BLOQUEADO - falta de dato repetible: de los 6 proveedores reales de la grilla, 2 (LOPHER, BUREAU VERITAS) tienen sectores agendados reales asociados (no se pueden eliminar), y los 2 que SI se pudieron eliminar limpio durante la exploracion (TECSUR, DOMINIONPERU) ya fueron consumidos - no quedan en la grilla para repetir el caso. Unico candidato sin probar: LUZ DEL SUR S.A.A. (nombre institucional, evitado por prudencia). La alternativa (registrar un proveedor propio descartable y eliminarlo) esta bloqueada por el mismo defecto H002 del catalogo. No es un defecto de la aplicacion.",
+    "fecha_verificacion": "2026-10-26"
+  }
+}
