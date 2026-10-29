@@ -520,6 +520,54 @@ def abrir_rf06(page, paso_excel=None):
     return abrir_aplicacion(page, ["Interno", "Gestión De Seguridad Xnear", "Anulación De Clientes A Corte"], "app-bloqueocorte", paso_excel=paso_excel)
 
 
+def abrir_mantenedor_acciones_legacy(page, paso_excel=None):
+    # Pantalla LEGACY (sin componente Angular) de la MISMA tabla de
+    # catalogo que usa RF-4 (Comercial > Acciones Realizadas De Corte) -
+    # confirmado en vivo 29/10/2026: mismos campos (Codigo, Descripcion,
+    # Ingresa Sellos, Corta, Anomalia, Rotura Pavimento, Medidor Interno,
+    # Ubicado). Vive en Comercial > Cortes Y Reposicion Del Servicio >
+    # Mantenedor De Acciones De Cortes. Util como fuente independiente
+    # para confirmar si un codigo REALMENTE existe o si quedo registrado
+    # de verdad, sin depender del propio "Leer" de RF-4 (que tiene un
+    # defecto real: no trae los datos de codigos que ya existen, los
+    # deja ver como si estuvieran vacios/disponibles - confirmado con
+    # los codigos 11, 25, 77, 81 y 99, todos existentes en este
+    # catalogo legacy pero con "Leer" vacio en RF-4).
+    page.get_by_role("link", name="  Aplicaciones").click(timeout=30000)
+    page.wait_for_timeout(1000)
+    if not any(page.locator("a").filter(has_text=re.compile(r"^\s*Comercial\s*$", re.I)).nth(i).is_visible()
+               for i in range(page.locator("a").filter(has_text=re.compile(r"^\s*Comercial\s*$", re.I)).count())):
+        page.get_by_role("link", name="  Aplicaciones").click(timeout=30000)
+        page.wait_for_timeout(1000)
+    _click_visible(page, "Comercial")
+    page.wait_for_timeout(800)
+    _click_visible(page, "Cortes Y Reposición Del Servicio")
+    page.wait_for_timeout(800)
+    with page.expect_popup(timeout=15000) as popup_info:
+        _click_visible(page, "Mantenedor De Acciones De Cortes")
+    app = popup_info.value
+    app.wait_for_load_state("networkidle", timeout=20000)
+    app.wait_for_timeout(1500)
+    frame = app.locator("#aplicacion").content_frame if app.locator("#aplicacion").count() else app
+    if paso_excel is not None:
+        capturar_paso(app, "mantenedor_legacy_abierto", paso_excel=paso_excel)
+    return app, frame
+
+
+def leer_codigos_legacy(frame):
+    """Devuelve el set de todos los codigos reales visibles en la tabla
+    del Mantenedor De Acciones De Cortes (legacy) - fuente de verdad
+    independiente de RF-4 para saber si un codigo ya existe de verdad."""
+    tabla = frame.locator("table").first
+    filas = tabla.locator("tbody tr")
+    codigos = set()
+    for i in range(filas.count()):
+        celdas = filas.nth(i).locator("td").all_text_contents()
+        if celdas and celdas[0].strip():
+            codigos.add(celdas[0].strip())
+    return codigos
+
+
 def obtener_modal_visible(frame, timeout_ms=4000):
     """Devuelve el locator del modal ".ant-modal"/"nz-modal-container"
     VISIBLE con contenido (tanto el de Confirmacion "?" como el de

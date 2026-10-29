@@ -520,6 +520,54 @@ def abrir_rf06(page, paso_excel=None):
     return abrir_aplicacion(page, ["Interno", "Gestión De Seguridad Xnear", "Anulación De Clientes A Corte"], "app-bloqueocorte", paso_excel=paso_excel)
 
 
+def abrir_mantenedor_acciones_legacy(page, paso_excel=None):
+    # Pantalla LEGACY (sin componente Angular) de la MISMA tabla de
+    # catalogo que usa RF-4 (Comercial > Acciones Realizadas De Corte) -
+    # confirmado en vivo 29/10/2026: mismos campos (Codigo, Descripcion,
+    # Ingresa Sellos, Corta, Anomalia, Rotura Pavimento, Medidor Interno,
+    # Ubicado). Vive en Comercial > Cortes Y Reposicion Del Servicio >
+    # Mantenedor De Acciones De Cortes. Util como fuente independiente
+    # para confirmar si un codigo REALMENTE existe o si quedo registrado
+    # de verdad, sin depender del propio "Leer" de RF-4 (que tiene un
+    # defecto real: no trae los datos de codigos que ya existen, los
+    # deja ver como si estuvieran vacios/disponibles - confirmado con
+    # los codigos 11, 25, 77, 81 y 99, todos existentes en este
+    # catalogo legacy pero con "Leer" vacio en RF-4).
+    page.get_by_role("link", name="  Aplicaciones").click(timeout=30000)
+    page.wait_for_timeout(1000)
+    if not any(page.locator("a").filter(has_text=re.compile(r"^\s*Comercial\s*$", re.I)).nth(i).is_visible()
+               for i in range(page.locator("a").filter(has_text=re.compile(r"^\s*Comercial\s*$", re.I)).count())):
+        page.get_by_role("link", name="  Aplicaciones").click(timeout=30000)
+        page.wait_for_timeout(1000)
+    _click_visible(page, "Comercial")
+    page.wait_for_timeout(800)
+    _click_visible(page, "Cortes Y Reposición Del Servicio")
+    page.wait_for_timeout(800)
+    with page.expect_popup(timeout=15000) as popup_info:
+        _click_visible(page, "Mantenedor De Acciones De Cortes")
+    app = popup_info.value
+    app.wait_for_load_state("networkidle", timeout=20000)
+    app.wait_for_timeout(1500)
+    frame = app.locator("#aplicacion").content_frame if app.locator("#aplicacion").count() else app
+    if paso_excel is not None:
+        capturar_paso(app, "mantenedor_legacy_abierto", paso_excel=paso_excel)
+    return app, frame
+
+
+def leer_codigos_legacy(frame):
+    """Devuelve el set de todos los codigos reales visibles en la tabla
+    del Mantenedor De Acciones De Cortes (legacy) - fuente de verdad
+    independiente de RF-4 para saber si un codigo ya existe de verdad."""
+    tabla = frame.locator("table").first
+    filas = tabla.locator("tbody tr")
+    codigos = set()
+    for i in range(filas.count()):
+        celdas = filas.nth(i).locator("td").all_text_contents()
+        if celdas and celdas[0].strip():
+            codigos.add(celdas[0].strip())
+    return codigos
+
+
 def obtener_modal_visible(frame, timeout_ms=4000):
     """Devuelve el locator del modal ".ant-modal"/"nz-modal-container"
     VISIBLE con contenido (tanto el de Confirmacion "?" como el de
@@ -803,30 +851,102 @@ def main():
         _CASO_OK = False
         try:
             login(page, paso_excel=1)
-            app, frame = abrir_rf04(page, paso_excel=1)
+            # CORREGIDO 29/10/2026 (IT2): el codigo "25" que sugeria la matriz
+            # original YA EXISTE en el sistema (confirmado contra el catalogo
+            # legacy independiente) - por eso el cierre original de SP3 (22/10)
+            # documento esto como "defecto real": en realidad se estaba
+            # reintentando crear un codigo duplicado una y otra vez, no probando
+            # el camino feliz real. HALLAZGO DE BACKEND (a reportar como mejora,
+            # no como defecto bloqueante - la migracion de este sprint fue solo de
+            # FRONTEND): el "Leer" de esta pantalla no trae los datos de un codigo
+            # que ya existe (deja los campos vacios, como si estuviera libre) -
+            # confirmado con 11, 25, 77, 81 y 99, los 5 ya existentes segun el
+            # catalogo legacy independiente (Mantenedor De Acciones De Cortes).
+            #
+            # Este caso ahora: 1) lee el catalogo REAL desde la pantalla legacy
+            # independiente para encontrar un codigo genuinamente libre, 2) lo
+            # registra en RF-4 con Corta=Si, 3) confirma el mensaje de exito real
+            # ("Acción de corte registrada.", un toast efimero - NO un modal, hay
+            # que sondear activamente para capturarlo a tiempo), 4) vuelve a la
+            # pantalla legacy y confirma que el codigo nuevo aparece de verdad.
+            app_legacy, frame_legacy = abrir_mantenedor_acciones_legacy(page, paso_excel=1)
+            codigos_existentes = leer_codigos_legacy(frame_legacy)
+            capturar_paso(app_legacy, "catalogo_legacy_codigos_existentes", paso_excel=1)
+
+            codigo_nuevo = None
+            for n in range(12, 999):
+                candidato = str(n)
+                if candidato not in codigos_existentes:
+                    codigo_nuevo = candidato
+                    break
+            assert codigo_nuevo is not None, "No se encontro ningun codigo numerico libre en el catalogo legacy"
+
+            # Recargar la pagina principal entre pantallas: tras cerrar un popup, el
+            # arbol de menu puede quedar en un estado donde "Aplicaciones" no revela
+            # "Comercial" al primer click (gotcha ya conocido del portal) - un
+            # reload garantiza un estado de menu limpio antes de abrir la siguiente.
+            page.reload()
+            page.wait_for_load_state("networkidle", timeout=20000)
+            page.wait_for_timeout(1000)
+
+            app_rf04, frame_rf04 = abrir_rf04(page, paso_excel=1)
+            app, frame = app_rf04, frame_rf04
             frame.locator("#codigo").click()
-            frame.locator("#codigo").fill("25")
+            frame.locator("#codigo").fill(codigo_nuevo)
             app.wait_for_timeout(500)
             frame.locator("button:has-text('Leer')").first.click()
             app.wait_for_timeout(1500)
+            assert frame.locator("#descripcion").input_value() == "", (
+                f"El codigo {codigo_nuevo} deberia estar libre (ya confirmado contra el catalogo legacy)"
+            )
 
             frame.locator("#descripcion").click()
-            frame.locator("#descripcion").fill("Corte en Baja Tensión")
+            frame.locator("#descripcion").fill(f"Corte en Baja Tensión DEMO {codigo_nuevo}")
             frame.locator("#fechaActivacion").fill("01/09/2026")
             checkbox_corta = frame.locator("label").filter(has_text=re.compile(r"^\s*Corta\s*$")).locator("input[type=checkbox]")
             checkbox_corta.check()
             app.wait_for_timeout(500)
-            capturar_paso(app, "formulario_completo_codigo_25", paso_excel=2)
+            capturar_paso(app, "formulario_completo_codigo_nuevo", paso_excel=2)
 
             frame.locator("button:has-text('Ingresar')").first.click()
             app.wait_for_timeout(1200)
-            mensaje = cerrar_modal_confirmacion(frame, aceptar=True, timeout_ms=6000)
-            assert mensaje is not None, "Se esperaba un dialogo de confirmacion antes de registrar el nuevo codigo"
-            capturar_paso(app, "confirmacion_de_registro_aceptada", paso_excel=3)
+            modal_confirmacion = obtener_modal_visible(frame, timeout_ms=6000)
+            assert modal_confirmacion is not None, "Se esperaba un dialogo de confirmacion antes de registrar el nuevo codigo"
+            mensaje = modal_confirmacion.inner_text()
+
+            # El mensaje de exito es un toast EFIMERO (nz-message/ant-message, dura
+            # ~2s) - hay que aceptar el modal y sondear de inmediato, SIN ninguna
+            # captura de evidencia de por medio (capturar_paso tarda lo suficiente,
+            # sobre todo con video, como para perder la ventana del toast).
+            toast = frame.locator("nz-message, .ant-message, .ant-message-notice")
+            modal_confirmacion.get_by_role("button", name=re.compile(r"^\s*Aceptar\s*$", re.I)).click()
+            toast_texto = None
+            for _intento in range(30):
+                if toast.count() and toast.first.is_visible():
+                    toast_texto = toast.first.inner_text()
+                    capturar_paso(app, "mensaje_de_exito_registrado", paso_excel=4)
+                    break
+                app.wait_for_timeout(150)
+            if toast_texto is None:
+                capturar_paso(app, "mensaje_de_exito_registrado", paso_excel=4)
+            assert toast_texto is not None and "registrada" in toast_texto.lower(), (
+                f"Se esperaba el mensaje de exito 'Acción de corte registrada.': {toast_texto!r}"
+            )
 
             app.wait_for_timeout(1200)
             assert frame.locator("#codigo").input_value() == "", "El formulario deberia reiniciarse tras registrar"
-            capturar_paso(app, "formulario_reiniciado", paso_excel=4)
+
+            # Confirmar de forma independiente (pantalla legacy) que el codigo
+            # quedo registrado de verdad.
+            page.reload()
+            page.wait_for_load_state("networkidle", timeout=20000)
+            page.wait_for_timeout(1000)
+            app, frame = abrir_mantenedor_acciones_legacy(page, paso_excel=5)
+            codigos_finales = leer_codigos_legacy(frame)
+            capturar_paso(app, "catalogo_legacy_confirma_codigo_nuevo", paso_excel=5)
+            assert codigo_nuevo in codigos_finales, (
+                f"El codigo {codigo_nuevo} deberia aparecer en el catalogo legacy tras el registro exitoso"
+            )
 
             capturar_paso(app, "estado_final_del_caso", paso_excel=max(_parsear_pasos_excel(PASOS_CASO), default=None))
             _CASO_OK = True
