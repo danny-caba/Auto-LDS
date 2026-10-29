@@ -18,28 +18,28 @@ from playwright.sync_api import sync_playwright, expect, TimeoutError as PWTimeo
 
 # Por defecto corre en segundo plano (headless), sin abrir ventana de
 # Edge. Para verlo trabajar en pantalla (util para un tester que quiere
-# mirar el caso paso a paso), fijar PR000349-SP3_HEADLESS=0 antes de correrlo.
-HEADLESS = os.environ.get("PR000349-SP3_HEADLESS", "1") == "1"
+# mirar el caso paso a paso), fijar PR000349-SP3-IT2_HEADLESS=0 antes de correrlo.
+HEADLESS = os.environ.get("PR000349-SP3-IT2_HEADLESS", "1") == "1"
 
-# Con PR000349-SP3_VIDEO=1 se graba un video (.webm) de toda la ejecucion,
+# Con PR000349-SP3-IT2_VIDEO=1 se graba un video (.webm) de toda la ejecucion,
 # ademas de las capturas por paso. Apagado por defecto (un video por caso
 # pesa/tarda mas; para una corrida masiva mejor dejarlo apagado y prenderlo
 # solo cuando haga falta revisar un caso en detalle).
-GRABAR_VIDEO = os.environ.get("PR000349-SP3_VIDEO", "0") == "1"
+GRABAR_VIDEO = os.environ.get("PR000349-SP3-IT2_VIDEO", "0") == "1"
 
-# Con PR000349-SP3_WORD=0 se omite el Word de evidencia (por defecto SI se
+# Con PR000349-SP3-IT2_WORD=0 se omite el Word de evidencia (por defecto SI se
 # genera: cada CPxxx.py arma su propio .docx con sus capturas, sin
 # depender de ningun otro archivo del proyecto -asi se puede copiar este
 # archivo solo a otra maquina y sigue generando su evidencia completa-).
-GRABAR_WORD = os.environ.get("PR000349-SP3_WORD", "1") == "1"
+GRABAR_WORD = os.environ.get("PR000349-SP3-IT2_WORD", "1") == "1"
 
-# Con PR000349-SP3_SLOWMO=<milisegundos> Playwright agrega esa pausa entre
+# Con PR000349-SP3-IT2_SLOWMO=<milisegundos> Playwright agrega esa pausa entre
 # CADA accion (click, fill, etc.). Sirve sobre todo junto con
-# PR000349-SP3_VIDEO=1: sin esto, un fill() llena el campo de golpe y en
+# PR000349-SP3-IT2_VIDEO=1: sin esto, un fill() llena el campo de golpe y en
 # el video no alcanza a verse el cambio. 0 = sin pausa (default, no afecta
 # la velocidad normal de la corrida).
 try:
-    SLOWMO = int(os.environ.get("PR000349-SP3_SLOWMO", "0"))
+    SLOWMO = int(os.environ.get("PR000349-SP3-IT2_SLOWMO", "0"))
 except ValueError:
     SLOWMO = 0
 
@@ -50,9 +50,9 @@ except ValueError:
 # vacios a clic casi en el mismo instante y no da tiempo a ver los datos ya
 # cargados antes de que se dispare la busqueda/accion. Por defecto se activa
 # solo si se esta grabando video (GRABAR_VIDEO); se puede ajustar o apagar
-# a mano con PR000349-SP3_PAUSA_ANTES_CLIC=<ms> (0 = sin pausa).
+# a mano con PR000349-SP3-IT2_PAUSA_ANTES_CLIC=<ms> (0 = sin pausa).
 try:
-    PAUSA_ANTES_CLIC = int(os.environ.get("PR000349-SP3_PAUSA_ANTES_CLIC", "1200" if GRABAR_VIDEO else "0"))
+    PAUSA_ANTES_CLIC = int(os.environ.get("PR000349-SP3-IT2_PAUSA_ANTES_CLIC", "1200" if GRABAR_VIDEO else "0"))
 except ValueError:
     PAUSA_ANTES_CLIC = 0
 
@@ -904,7 +904,7 @@ def main():
             frame.locator("#descripcion").fill(f"Corte en Baja Tensión DEMO {codigo_nuevo}")
             frame.locator("#fechaActivacion").fill("01/09/2026")
             checkbox_corta = frame.locator("label").filter(has_text=re.compile(r"^\s*Corta\s*$")).locator("input[type=checkbox]")
-            checkbox_corta.check()
+            checkbox_corta.click(force=True)
             app.wait_for_timeout(500)
             capturar_paso(app, "formulario_completo_codigo_nuevo", paso_excel=2)
 
@@ -915,20 +915,21 @@ def main():
             mensaje = modal_confirmacion.inner_text()
 
             # El mensaje de exito es un toast EFIMERO (nz-message/ant-message, dura
-            # ~2s) - hay que aceptar el modal y sondear de inmediato, SIN ninguna
-            # captura de evidencia de por medio (capturar_paso tarda lo suficiente,
-            # sobre todo con video, como para perder la ventana del toast).
-            toast = frame.locator("nz-message, .ant-message, .ant-message-notice")
+            # ~2s) - un sondeo manual con wait_for_timeout entre intentos puede
+            # perder la ventana del toast (confirmado en vivo: mas lento todavia
+            # con GRABAR_VIDEO activo, el overhead de la grabacion retrasa cada
+            # chequeo del loop). Usar wait_for(state="visible") nativo de Playwright
+            # en su lugar: reacciona al evento real en vez de sondear a intervalos
+            # fijos, mucho mas confiable.
+            toast = frame.locator("nz-message, .ant-message, .ant-message-notice").first
             modal_confirmacion.get_by_role("button", name=re.compile(r"^\s*Aceptar\s*$", re.I)).click()
             toast_texto = None
-            for _intento in range(30):
-                if toast.count() and toast.first.is_visible():
-                    toast_texto = toast.first.inner_text()
-                    capturar_paso(app, "mensaje_de_exito_registrado", paso_excel=4)
-                    break
-                app.wait_for_timeout(150)
-            if toast_texto is None:
-                capturar_paso(app, "mensaje_de_exito_registrado", paso_excel=4)
+            try:
+                toast.wait_for(state="visible", timeout=8000)
+                toast_texto = toast.inner_text()
+            except PWTimeoutError:
+                pass
+            capturar_paso(app, "mensaje_de_exito_registrado", paso_excel=4)
             assert toast_texto is not None and "registrada" in toast_texto.lower(), (
                 f"Se esperaba el mensaje de exito 'Acción de corte registrada.': {toast_texto!r}"
             )

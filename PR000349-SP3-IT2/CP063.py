@@ -18,28 +18,28 @@ from playwright.sync_api import sync_playwright, expect, TimeoutError as PWTimeo
 
 # Por defecto corre en segundo plano (headless), sin abrir ventana de
 # Edge. Para verlo trabajar en pantalla (util para un tester que quiere
-# mirar el caso paso a paso), fijar PR000349-SP3_HEADLESS=0 antes de correrlo.
-HEADLESS = os.environ.get("PR000349-SP3_HEADLESS", "1") == "1"
+# mirar el caso paso a paso), fijar PR000349-SP3-IT2_HEADLESS=0 antes de correrlo.
+HEADLESS = os.environ.get("PR000349-SP3-IT2_HEADLESS", "1") == "1"
 
-# Con PR000349-SP3_VIDEO=1 se graba un video (.webm) de toda la ejecucion,
+# Con PR000349-SP3-IT2_VIDEO=1 se graba un video (.webm) de toda la ejecucion,
 # ademas de las capturas por paso. Apagado por defecto (un video por caso
 # pesa/tarda mas; para una corrida masiva mejor dejarlo apagado y prenderlo
 # solo cuando haga falta revisar un caso en detalle).
-GRABAR_VIDEO = os.environ.get("PR000349-SP3_VIDEO", "0") == "1"
+GRABAR_VIDEO = os.environ.get("PR000349-SP3-IT2_VIDEO", "0") == "1"
 
-# Con PR000349-SP3_WORD=0 se omite el Word de evidencia (por defecto SI se
+# Con PR000349-SP3-IT2_WORD=0 se omite el Word de evidencia (por defecto SI se
 # genera: cada CPxxx.py arma su propio .docx con sus capturas, sin
 # depender de ningun otro archivo del proyecto -asi se puede copiar este
 # archivo solo a otra maquina y sigue generando su evidencia completa-).
-GRABAR_WORD = os.environ.get("PR000349-SP3_WORD", "1") == "1"
+GRABAR_WORD = os.environ.get("PR000349-SP3-IT2_WORD", "1") == "1"
 
-# Con PR000349-SP3_SLOWMO=<milisegundos> Playwright agrega esa pausa entre
+# Con PR000349-SP3-IT2_SLOWMO=<milisegundos> Playwright agrega esa pausa entre
 # CADA accion (click, fill, etc.). Sirve sobre todo junto con
-# PR000349-SP3_VIDEO=1: sin esto, un fill() llena el campo de golpe y en
+# PR000349-SP3-IT2_VIDEO=1: sin esto, un fill() llena el campo de golpe y en
 # el video no alcanza a verse el cambio. 0 = sin pausa (default, no afecta
 # la velocidad normal de la corrida).
 try:
-    SLOWMO = int(os.environ.get("PR000349-SP3_SLOWMO", "0"))
+    SLOWMO = int(os.environ.get("PR000349-SP3-IT2_SLOWMO", "0"))
 except ValueError:
     SLOWMO = 0
 
@@ -50,9 +50,9 @@ except ValueError:
 # vacios a clic casi en el mismo instante y no da tiempo a ver los datos ya
 # cargados antes de que se dispare la busqueda/accion. Por defecto se activa
 # solo si se esta grabando video (GRABAR_VIDEO); se puede ajustar o apagar
-# a mano con PR000349-SP3_PAUSA_ANTES_CLIC=<ms> (0 = sin pausa).
+# a mano con PR000349-SP3-IT2_PAUSA_ANTES_CLIC=<ms> (0 = sin pausa).
 try:
-    PAUSA_ANTES_CLIC = int(os.environ.get("PR000349-SP3_PAUSA_ANTES_CLIC", "1200" if GRABAR_VIDEO else "0"))
+    PAUSA_ANTES_CLIC = int(os.environ.get("PR000349-SP3-IT2_PAUSA_ANTES_CLIC", "1200" if GRABAR_VIDEO else "0"))
 except ValueError:
     PAUSA_ANTES_CLIC = 0
 

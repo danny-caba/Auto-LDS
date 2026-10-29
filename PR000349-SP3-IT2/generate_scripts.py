@@ -33,7 +33,7 @@ sys.path.insert(0, str(FRAMEWORK_DIR))
 sys.path.insert(0, str(FRAMEWORK_DIR / "modulos"))
 import web_lds_core as core  # noqa: E402
 
-PROYECTO = "PR000349-SP3"  # debe coincidir con el nombre de esta carpeta
+PROYECTO = "PR000349-SP3-IT2"  # debe coincidir con el nombre de esta carpeta
 MATRIZ = json.loads((OUT_DIR / "matriz_casos.json").read_text(encoding="utf-8"))
 
 ENV_TOGGLES = core.ENV_TOGGLES_CODE.replace("__PROYECTO__", PROYECTO)
@@ -1428,7 +1428,7 @@ frame.locator("#descripcion").click()
 frame.locator("#descripcion").fill(f"Corte en Baja Tensión DEMO {codigo_nuevo}")
 frame.locator("#fechaActivacion").fill("01/09/2026")
 checkbox_corta = frame.locator("label").filter(has_text=re.compile(r"^\\s*Corta\\s*$")).locator("input[type=checkbox]")
-checkbox_corta.check()
+checkbox_corta.click(force=True)
 app.wait_for_timeout(500)
 capturar_paso(app, "formulario_completo_codigo_nuevo", paso_excel=2)
 
@@ -1439,20 +1439,21 @@ assert modal_confirmacion is not None, "Se esperaba un dialogo de confirmacion a
 mensaje = modal_confirmacion.inner_text()
 
 # El mensaje de exito es un toast EFIMERO (nz-message/ant-message, dura
-# ~2s) - hay que aceptar el modal y sondear de inmediato, SIN ninguna
-# captura de evidencia de por medio (capturar_paso tarda lo suficiente,
-# sobre todo con video, como para perder la ventana del toast).
-toast = frame.locator("nz-message, .ant-message, .ant-message-notice")
+# ~2s) - un sondeo manual con wait_for_timeout entre intentos puede
+# perder la ventana del toast (confirmado en vivo: mas lento todavia
+# con GRABAR_VIDEO activo, el overhead de la grabacion retrasa cada
+# chequeo del loop). Usar wait_for(state="visible") nativo de Playwright
+# en su lugar: reacciona al evento real en vez de sondear a intervalos
+# fijos, mucho mas confiable.
+toast = frame.locator("nz-message, .ant-message, .ant-message-notice").first
 modal_confirmacion.get_by_role("button", name=re.compile(r"^\\s*Aceptar\\s*$", re.I)).click()
 toast_texto = None
-for _intento in range(30):
-    if toast.count() and toast.first.is_visible():
-        toast_texto = toast.first.inner_text()
-        capturar_paso(app, "mensaje_de_exito_registrado", paso_excel=4)
-        break
-    app.wait_for_timeout(150)
-if toast_texto is None:
-    capturar_paso(app, "mensaje_de_exito_registrado", paso_excel=4)
+try:
+    toast.wait_for(state="visible", timeout=8000)
+    toast_texto = toast.inner_text()
+except PWTimeoutError:
+    pass
+capturar_paso(app, "mensaje_de_exito_registrado", paso_excel=4)
 assert toast_texto is not None and "registrada" in toast_texto.lower(), (
     f"Se esperaba el mensaje de exito 'Acción de corte registrada.': {toast_texto!r}"
 )
