@@ -91,6 +91,7 @@ def main():
     p.add_argument("--excel", required=True, help="Ruta al .xlsx de la matriz de casos (MCP-...)")
     p.add_argument("--ef", default=None, help="Ruta al .docx de Especificacion Funcional (opcional)")
     p.add_argument("--et", default=None, help="Ruta al .docx de Diseno Tecnico (opcional)")
+    p.add_argument("--extra", action="append", default=[], help="Ruta a un documento adicional (PDF, Word, manual de usuario, etc.) - repetir la opcion para varios. Se copia a documentos/; si es .docx tambien se le extrae texto+imagenes, igual que EF/ET.")
     p.add_argument("--hoja", default=None, help="Nombre exacto de la hoja del Excel (default: autodetecta)")
     args = p.parse_args()
 
@@ -126,6 +127,20 @@ def main():
             shutil.copy2(origen, destino)
         print(f"[4/5] {etiqueta} en {destino}, extrayendo texto+imagenes...")
         subprocess.run([str(PYTHON), str(FRAMEWORK_DIR / "extraer_docx.py"), str(destino)], check=True)
+
+    for ruta_extra in args.extra:
+        origen = Path(ruta_extra)
+        if not origen.is_file():
+            print(f"  (aviso) no existe el documento adicional: {origen} - se omite.")
+            continue
+        destino = documentos_dir / origen.name
+        if destino.resolve() != origen.resolve():
+            shutil.copy2(origen, destino)
+        if destino.suffix.lower() == ".docx":
+            print(f"[4/5] Adicional {destino.name} en {destino}, extrayendo texto+imagenes...")
+            subprocess.run([str(PYTHON), str(FRAMEWORK_DIR / "extraer_docx.py"), str(destino)], check=True)
+        else:
+            print(f"[4/5] Adicional {destino.name} copiado a {destino} (sin extraccion, no es .docx).")
 
     generate_scripts_py = proyecto_dir / "generate_scripts.py"
     if not generate_scripts_py.exists():

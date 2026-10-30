@@ -79,17 +79,29 @@ def _correr_subprocess_lineas(cmd: list[str], cwd: Path, on_linea) -> int:
     return proc.returncode
 
 
-def lanzar_bootstrap_y_explorar(proyecto: str, excel_path: Path, ef_path: Path | None, et_path: Path | None) -> None:
+def lanzar_bootstrap_y_explorar(
+    proyecto: str,
+    excel_path: Path,
+    ef_path: Path | None,
+    et_path: Path | None,
+    extra_paths: list[Path] | None = None,
+) -> None:
     hilo = threading.Thread(
         target=_bootstrap_y_explorar,
-        args=(proyecto, excel_path, ef_path, et_path),
+        args=(proyecto, excel_path, ef_path, et_path, extra_paths or []),
         daemon=True,
     )
     _registrar_hilo(proyecto, hilo)
     hilo.start()
 
 
-def _bootstrap_y_explorar(proyecto: str, excel_path: Path, ef_path: Path | None, et_path: Path | None) -> None:
+def _bootstrap_y_explorar(
+    proyecto: str,
+    excel_path: Path,
+    ef_path: Path | None,
+    et_path: Path | None,
+    extra_paths: list[Path],
+) -> None:
     pdir = proyecto_dir(proyecto)
     estado.actualizar(pdir, fase="bootstrap", mensaje="Creando estructura y extrayendo matriz...", log=[])
 
@@ -98,6 +110,8 @@ def _bootstrap_y_explorar(proyecto: str, excel_path: Path, ef_path: Path | None,
         cmd += ["--ef", str(ef_path)]
     if et_path is not None:
         cmd += ["--et", str(et_path)]
+    for extra_path in extra_paths:
+        cmd += ["--extra", str(extra_path)]
 
     try:
         rc = _correr_subprocess_lineas(cmd, cwd=FRAMEWORK_DIR, on_linea=lambda l: estado.agregar_log(pdir, l))

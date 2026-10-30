@@ -242,8 +242,17 @@ class Handler(BaseHTTPRequestHandler):
             et_path = stage / (et_parte.nombre_archivo or "ET.docx")
             et_path.write_bytes(et_parte.datos)
 
+        extra_paths = []
+        for i, extra_parte in enumerate(campos.get("extra", [])):
+            if not extra_parte.datos:
+                continue
+            nombre = extra_parte.nombre_archivo or f"adicional_{i + 1}"
+            extra_path = stage / nombre
+            extra_path.write_bytes(extra_parte.datos)
+            extra_paths.append(extra_path)
+
         try:
-            procesos.lanzar_bootstrap_y_explorar(proyecto, excel_path, ef_path, et_path)
+            procesos.lanzar_bootstrap_y_explorar(proyecto, excel_path, ef_path, et_path, extra_paths)
         except procesos.ProcesoEnCursoError:
             self._error_json(409, "ya_hay_un_proceso_en_curso")
             return

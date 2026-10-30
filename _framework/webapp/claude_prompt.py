@@ -109,6 +109,12 @@ Revisa primero tu memoria de proyectos Web LDS anteriores (gotchas de
 Playwright, credenciales/datos de prueba reutilizables, patrones de
 dialogo, etc.) antes de explorar de cero - varios ya estan documentados.
 
+Revisa tambien {proyecto_dir / "documentos"} por completo antes de
+explorar en vivo - ademas del Excel/EF/ET puede haber documentos
+adicionales (manuales de usuario en PDF, capturas de referencia, etc.)
+subidos a mano para este proyecto puntual, con contexto util (reglas de
+negocio, pantallas, mensajes reales) que puede ahorrar exploracion.
+
 No inventes ni pidas credenciales nuevas - reusa las que ya estan
 configuradas en C:\\Proyectos\\PlataformaWeb\\.env, igual que el resto de
 los proyectos.
