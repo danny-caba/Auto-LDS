@@ -14,6 +14,7 @@ dos flujos a la vez sobre el mismo proyecto.
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -61,10 +62,24 @@ def hay_proceso_en_curso(proyecto: str) -> bool:
 def _correr_subprocess_lineas(cmd: list[str], cwd: Path, on_linea) -> int:
     """Corre `cmd`, invocando `on_linea(texto)` por cada linea de
     stdout+stderr conforme aparece (no espera a que termine). Devuelve
-    el codigo de salida."""
+    el codigo de salida.
+
+    BUG REAL encontrado y corregido (Etapa 6 del piloto, 31/10/2026):
+    `encoding="utf-8"` aca abajo solo controla como el PADRE decodifica
+    los bytes que ya llegaron por el pipe - no fuerza que el HIJO
+    (CPxxx.py, que puede imprimir texto de la pantalla real, ej. el
+    caracter "☰" del menu de Web LDS) use UTF-8 para sus propios
+    print(). Sin PYTHONIOENCODING explicito, un hijo de Python en
+    Windows puede arrancar con el codepage de consola por defecto
+    (cp1252/"charmap", sin soporte para esos caracteres) y crashear con
+    UnicodeEncodeError apenas imprime algo asi - confirmado en vivo:
+    el mismo CPxxx.py corria perfecto invocado directo desde una
+    terminal, y crasheaba corrido COMO HIJO de este webapp."""
+    env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
     proc = subprocess.Popen(
         cmd,
         cwd=str(cwd),
+        env=env,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
@@ -79,28 +94,42 @@ def _correr_subprocess_lineas(cmd: list[str], cwd: Path, on_linea) -> int:
     return proc.returncode
 
 
-def lanzar_bootstrap_y_explorar(
+def lanzar_bootstrap(
     proyecto: str,
     excel_path: Path,
     ef_path: Path | None,
     et_path: Path | None,
     extra_paths: list[Path] | None = None,
+    proyecto_base: str | None = None,
 ) -> None:
+    """Solo carga documentos + extrae matriz/EF/ET (`nuevo_proyecto.py`).
+    NO dispara exploracion/generacion con IA - eso es `lanzar_explorar()`,
+    una accion aparte que el usuario dispara explicitamente despues de
+    revisar que la carga quedo bien (separacion pedida para el piloto
+    MS024472, antes esto estaba encadenado sin pausa en una sola
+    funcion).
+
+    `proyecto_base` (opcional): si se pasa, es una NUEVA ITERACION de un
+    proyecto existente - se copia su `generate_scripts.py` (y
+    `casos_fallidos_confirmados.json` si tiene) en vez de dejar el
+    esqueleto vacio. SIEMPRE pedido de forma explicita (nunca se
+    adivina por el nombre) - decision tomada en la Etapa 6 del piloto."""
     hilo = threading.Thread(
-        target=_bootstrap_y_explorar,
-        args=(proyecto, excel_path, ef_path, et_path, extra_paths or []),
+        target=_bootstrap,
+        args=(proyecto, excel_path, ef_path, et_path, extra_paths or [], proyecto_base),
         daemon=True,
     )
     _registrar_hilo(proyecto, hilo)
     hilo.start()
 
 
-def _bootstrap_y_explorar(
+def _bootstrap(
     proyecto: str,
     excel_path: Path,
     ef_path: Path | None,
     et_path: Path | None,
     extra_paths: list[Path],
+    proyecto_base: str | None = None,
 ) -> None:
     pdir = proyecto_dir(proyecto)
     estado.actualizar(pdir, fase="bootstrap", mensaje="Creando estructura y extrayendo matriz...", log=[])
@@ -127,7 +156,60 @@ def _bootstrap_y_explorar(
         estado.actualizar(pdir, fase="bootstrap_error", mensaje="nuevo_proyecto.py termino OK pero no se genero matriz_casos.json")
         return
 
-    estado.actualizar(pdir, fase="bootstrap_ok", mensaje="Bootstrap completo. matriz_casos.json generado.")
+    if proyecto_base:
+        _copiar_de_proyecto_base(proyecto, proyecto_base, pdir)
+
+    estado.actualizar(pdir, fase="bootstrap_ok", mensaje="Bootstrap completo. matriz_casos.json generado. Revisa la carga y, cuando quieras, dispara la exploracion con IA aparte.")
+
+
+def _copiar_de_proyecto_base(proyecto: str, proyecto_base: str, pdir: Path) -> None:
+    """Copia generate_scripts.py (pisando el esqueleto vacio que ya dejo
+    nuevo_proyecto.py) y casos_fallidos_confirmados.json (si existe) del
+    proyecto base, y corrige la linea `PROYECTO = "..."` para que
+    coincida con el nombre de la carpeta NUEVA.
+
+    BUG REAL que esto evita (confirmado en vivo, PR000349-SP3-IT2,
+    29/10/2026): si se clona `generate_scripts.py` de un proyecto a otro
+    sin actualizar `PROYECTO`, TODOS los toggles de entorno de cada
+    CPxxx.py generado (GRABAR_VIDEO, etc.) quedan esperando el prefijo
+    VIEJO en silencio, sin ningun error - costo una sesion entera
+    detectarlo la primera vez que paso a mano."""
+    pdir_base = proyecto_dir(proyecto_base)
+    origen = pdir_base / "generate_scripts.py"
+    destino = pdir / "generate_scripts.py"
+    contenido = origen.read_text(encoding="utf-8")
+    contenido_corregido = re.sub(
+        r'PROYECTO\s*=\s*"[^"]*"',
+        f'PROYECTO = "{proyecto}"',
+        contenido,
+        count=1,
+    )
+    cambio_proyecto = contenido_corregido != contenido
+    destino.write_text(contenido_corregido, encoding="utf-8")
+    estado.agregar_log(pdir, f"[iteracion] generate_scripts.py copiado de {proyecto_base} (PROYECTO actualizado: {cambio_proyecto}).")
+
+    casos_fallidos_base = pdir_base / "casos_fallidos_confirmados.json"
+    if casos_fallidos_base.is_file():
+        shutil.copy2(casos_fallidos_base, pdir / "casos_fallidos_confirmados.json")
+        estado.agregar_log(pdir, f"[iteracion] casos_fallidos_confirmados.json tambien copiado de {proyecto_base} - revisar si sigue vigente.")
+
+
+def lanzar_explorar(proyecto: str) -> None:
+    """Dispara la exploracion/generacion con IA sobre un proyecto YA
+    bootstrapeado (requiere matriz_casos.json existente - ver
+    `lanzar_bootstrap()`). Accion separada y explicita, nunca encadenada
+    automaticamente despues de la carga."""
+    pdir = proyecto_dir(proyecto)
+    if not (pdir / "matriz_casos.json").exists():
+        raise FileNotFoundError(f"{proyecto} no tiene matriz_casos.json todavia - correr lanzar_bootstrap() primero")
+    hilo = threading.Thread(target=_explorar, args=(proyecto,), daemon=True)
+    _registrar_hilo(proyecto, hilo)
+    hilo.start()
+
+
+def _explorar(proyecto: str) -> None:
+    pdir = proyecto_dir(proyecto)
+    estado.actualizar(pdir, fase="explorando_preparando", mensaje="Preparando la exploracion...", log=[])
 
     claude_disponible = shutil.which("claude") is not None
     estado.actualizar(pdir, claude_disponible=claude_disponible)
@@ -202,18 +284,26 @@ def lanzar_ejecutar_pruebas(proyecto: str, rf_list: list[str], video: bool) -> N
 def _ejecutar_pruebas(proyecto: str, rf_list: list[str], video: bool) -> None:
     pdir = proyecto_dir(proyecto)
 
-    # run_all.py y generar_reporte_excel.py son "copia textual" por
-    # proyecto (ver NUEVO_PROYECTO_CHECKLIST.md Seccion 7) - se
-    # refrescan aca para que un proyecto viejo herede --rf sin tener
-    # que ir a mano a re-copiar el archivo.
+    # run_all.py, generar_reporte_excel.py y ejecutar_con_resultados.py
+    # son "copia textual" por proyecto (ver NUEVO_PROYECTO_CHECKLIST.md
+    # Seccion 7) - se refrescan aca para que un proyecto viejo herede
+    # --rf/la persistencia de resultados sin tener que ir a mano a
+    # re-copiar el archivo.
     shutil.copy2(FRAMEWORK_DIR / "run_all.py", pdir / "run_all.py")
     shutil.copy2(FRAMEWORK_DIR / "generar_reporte_excel.py", pdir / "generar_reporte_excel.py")
+    shutil.copy2(FRAMEWORK_DIR / "ejecutar_con_resultados.py", pdir / "ejecutar_con_resultados.py")
 
-    estado.actualizar(pdir, fase="ejecutando_pruebas", mensaje=f"Ejecutando RF: {', '.join(rf_list)}", log=[], progreso={"actual": 0, "total": 0, "cp_actual": ""})
+    estado.actualizar(pdir, fase="ejecutando_pruebas", mensaje=f"Ejecutando RF: {', '.join(rf_list)}", log=[], progreso={"actual": 0, "total": 0, "cp_actual": ""}, prompt_ejecucion=None)
 
-    cmd = [str(PYTHON), "-u", str(pdir / "run_all.py"), "--rf", ",".join(rf_list)]
+    # Se usa ejecutar_con_resultados.py (no run_all.py directo) para que
+    # cada corrida desde la web tambien quede persistida en
+    # resultados/<run_id>/<CP>/<intento>/ (Etapa 3) - no pisa evidencia
+    # de corridas anteriores, a diferencia de correr run_all.py solo.
+    cmd = [str(PYTHON), "-u", str(pdir / "ejecutar_con_resultados.py"), "--rf", ",".join(rf_list)]
     if video:
         cmd.append("--video")
+
+    resumen_ejecucion = {}
 
     def _on_linea(linea: str) -> None:
         estado.agregar_log(pdir, linea)
@@ -221,12 +311,27 @@ def _ejecutar_pruebas(proyecto: str, rf_list: list[str], video: bool) -> None:
         if m:
             actual, total, cp = m.group(1), m.group(2), m.group(3)
             estado.actualizar(pdir, progreso={"actual": int(actual), "total": int(total), "cp_actual": cp})
+            return
+        m2 = _RE_WEBAPP_RESUMEN.search(linea)
+        if m2:
+            try:
+                resumen_ejecucion.update(json.loads(m2.group(1)))
+            except json.JSONDecodeError:
+                pass
 
     try:
         rc = _correr_subprocess_lineas(cmd, cwd=pdir, on_linea=_on_linea)
     except Exception as e:  # noqa: BLE001
-        estado.actualizar(pdir, fase="reporte_error", mensaje=f"Excepcion al correr run_all.py: {e}")
+        estado.actualizar(pdir, fase="reporte_error", mensaje=f"Excepcion al correr ejecutar_con_resultados.py: {e}")
         return
+
+    # Si algun caso no dio OK, ejecutar_con_resultados.py arma un prompt
+    # de ayuda (diagnostico) en su WEBAPP_RESUMEN - se muestra en la web
+    # con el mismo patron que el prompt de exploracion (texto + boton de
+    # copiar), para llevarlo a una sesion de Claude Code.
+    prompt_ejecucion = resumen_ejecucion.get("prompt_ayuda")
+    if prompt_ejecucion:
+        estado.actualizar(pdir, prompt_ejecucion=prompt_ejecucion)
 
     estado.actualizar(pdir, fase="generando_reporte", mensaje="Corrida terminada, generando reporte consolidado...")
 

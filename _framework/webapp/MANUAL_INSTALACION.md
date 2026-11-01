@@ -85,30 +85,32 @@ La webapp tiene 3 pestañas:
 
 1. **Nuevo proyecto** — subir la matriz de casos (Excel, obligatoria) y
    opcionalmente las Especificaciones Funcionales/Técnicas (Word).
-   Completar el "Código de proyecto" (ej. `PR000456` o `PR000456-SP1`)
-   y presionar **Analizar**. Esto arma la carpeta del proyecto
-   (`C:\AUTOMATIZACION_LDS\<codigo>\`) con la matriz extraída a JSON.
+   Completar el "Código de proyecto" (ej. `PR000456`, `IP000456` o
+   `MS000456`, con `-SPn` opcional) y presionar **"1. Cargar
+   documentos"**. Esto SOLO arma la carpeta del proyecto
+   (`C:\AUTOMATIZACION_LDS\<codigo>\`) con la matriz extraída a JSON —
+   no dispara ninguna exploración todavía. Cuando la carga termina
+   (fase `bootstrap_ok`), aparece un segundo botón, **"2. Explorar con
+   IA"** — es una acción separada y explícita, pensada para poder
+   revisar la carga (documentos, matriz) antes de decidir si se avanza
+   a explorar.
 2. **Ejecutar pruebas** — elegir uno o más RF del proyecto y correr los
    casos (con o sin video).
 3. **Reporte** — ver el resultado consolidado (OK/FALLO) de la última
    corrida.
 
-### Sobre el botón "Analizar" y la IA
+### Sobre el botón "2. Explorar con IA"
 
-El botón "Analizar" intenta dos cosas:
-- **Bootstrap del proyecto** (siempre funciona): arma la carpeta,
-  extrae la matriz Excel a JSON, deja todo listo para generar los
-  casos.
-- **Exploración y generación automática de los casos con IA**: solo
-  funciona si el CLI `claude` (Claude Code) está instalado en esta
-  máquina como programa standalone (no la extensión de VS Code/IDE,
-  que es algo distinto). **Hoy ese CLI no está instalado en esta VM**
-  (ver sección siguiente) — la webapp lo detecta y, en su lugar,
-  muestra el prompt completo con un botón **"Copiar"** para pegarlo a
-  mano en una sesión interactiva de Claude Code. Este punto de entrada
-  manual es el que se viene usando hasta ahora y sigue siendo 100%
-  válido - no es un paso roto, es el modo normal de operar mientras no
-  se instale el CLI.
+Este botón intenta la **exploración y generación automática de los
+casos con IA**: solo funciona si el CLI `claude` (Claude Code) está
+instalado en esta máquina como programa standalone (no la extensión de
+VS Code/IDE, que es algo distinto). **Hoy ese CLI no está instalado en
+esta VM** (ver sección siguiente) — la webapp lo detecta y, en su
+lugar, muestra el prompt completo con un botón **"Copiar"** para
+pegarlo a mano en una sesión interactiva de Claude Code. Este punto de
+entrada manual es el que se viene usando hasta ahora y sigue siendo
+100% válido - no es un paso roto, es el modo normal de operar mientras
+no se instale el CLI.
 
 ## Problemas comunes
 

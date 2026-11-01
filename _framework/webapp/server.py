@@ -1,9 +1,12 @@
 """
 Servidor web local (SOLO libreria estandar de Python, sin Flask/FastAPI -
 ver README.md de esta carpeta para el por que) que envuelve el flujo de
-automatizacion LDS: subir los 3 documentos de un proyecto, disparar el
-bootstrap + exploracion/generacion con IA, ejecutar las pruebas filtradas
-por RF, y mostrar el reporte consolidado.
+automatizacion LDS: subir los documentos de un proyecto (solo carga,
+`POST /api/proyectos/analizar`), disparar la exploracion/generacion con
+IA como accion SEPARADA y explicita (`POST
+/api/proyectos/<proyecto>/explorar` - nunca se encadena sola despues de
+la carga), ejecutar las pruebas filtradas por RF, y mostrar el reporte
+consolidado. Acepta proyectos con prefijo PR/IP/MS (ver `_RE_PROYECTO`).
 
 Uso:
     .venv\\Scripts\\python.exe _framework\\webapp\\server.py
@@ -35,7 +38,7 @@ STATIC_DIR = WEBAPP_DIR / "static"
 UPLOADS_DIR = WEBAPP_DIR / "_uploads"
 PUERTO = int(os.environ.get("WEBAPP_PORT", "8765"))
 
-_RE_PROYECTO = re.compile(r"^PR\d{6}(-SP\d+)?$")
+_RE_PROYECTO = re.compile(r"^(PR|IP|MS)\d{6}(-SP\d+)?$")
 
 _CONTENT_TYPES = {
     ".html": "text/html; charset=utf-8",
@@ -193,6 +196,10 @@ class Handler(BaseHTTPRequestHandler):
             if m:
                 self._post_ejecutar(unquote(m.group(1)))
                 return
+            m = re.match(r"^/api/proyectos/([^/]+)/explorar$", ruta)
+            if m:
+                self._post_explorar(unquote(m.group(1)))
+                return
             self._error_json(404, "Ruta no encontrada")
         except Exception as e:  # noqa: BLE001
             traceback.print_exc()
@@ -251,13 +258,49 @@ class Handler(BaseHTTPRequestHandler):
             extra_path.write_bytes(extra_parte.datos)
             extra_paths.append(extra_path)
 
+        proyecto_base = None
+        if "proyecto_base" in campos and campos["proyecto_base"][0].texto().strip():
+            proyecto_base = campos["proyecto_base"][0].texto().strip()
+            try:
+                _validar_proyecto(proyecto_base)
+            except ValueError as e:
+                self._error_json(400, f"Proyecto base invalido: {e}")
+                return
+            if not (procesos.proyecto_dir(proyecto_base) / "generate_scripts.py").exists():
+                self._error_json(400, f"El proyecto base {proyecto_base!r} no tiene generate_scripts.py para copiar")
+                return
+
         try:
-            procesos.lanzar_bootstrap_y_explorar(proyecto, excel_path, ef_path, et_path, extra_paths)
+            procesos.lanzar_bootstrap(proyecto, excel_path, ef_path, et_path, extra_paths, proyecto_base=proyecto_base)
         except procesos.ProcesoEnCursoError:
             self._error_json(409, "ya_hay_un_proceso_en_curso")
             return
 
         self._json({"proyecto": proyecto, "fase": "bootstrap"}, 202)
+
+    def _post_explorar(self, proyecto: str):
+        try:
+            _validar_proyecto(proyecto)
+        except ValueError as e:
+            self._error_json(400, str(e))
+            return
+
+        pdir = procesos.proyecto_dir(proyecto)
+        if not (pdir / "matriz_casos.json").exists():
+            self._error_json(404, "El proyecto no existe o todavia no tiene matriz_casos.json (correr la carga primero)")
+            return
+
+        if procesos.hay_proceso_en_curso(proyecto):
+            self._error_json(409, "ya_hay_un_proceso_en_curso")
+            return
+
+        try:
+            procesos.lanzar_explorar(proyecto)
+        except procesos.ProcesoEnCursoError:
+            self._error_json(409, "ya_hay_un_proceso_en_curso")
+            return
+
+        self._json({"proyecto": proyecto, "fase": "explorando"}, 202)
 
     def _post_ejecutar(self, proyecto: str):
         try:

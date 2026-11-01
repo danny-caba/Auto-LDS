@@ -1,6 +1,7 @@
 "use strict";
 
 const FASES_TERMINALES = new Set([
+  "bootstrap_ok",
   "bootstrap_error",
   "exploracion_manual_pendiente",
   "exploracion_terminada",
@@ -60,6 +61,36 @@ async function cargarProyectosEnSelect(idSelect, onChange) {
 }
 
 // ---------- Vista: Nuevo proyecto ----------
+// Carga (bootstrap) y exploracion con IA son 2 acciones SEPARADAS -
+// subir documentos nunca dispara la exploracion sola, hace falta el
+// boton "2. Explorar con IA" aparte, una vez que la carga termino OK.
+
+let proyectoActual = "";
+
+// Checkbox "Es una nueva iteracion" - SIEMPRE pregunta (nunca adivina
+// por el nombre), con un desplegable manual de cual es el proyecto
+// base. Al tildarlo, carga la lista de proyectos existentes recien en
+// ese momento (no de entrada, para no pegarle a /api/proyectos sin
+// necesidad).
+const checkboxIteracion = document.getElementById("es-iteracion");
+const boxProyectoBase = document.getElementById("proyecto-base-box");
+const selectProyectoBase = document.getElementById("proyecto-base");
+checkboxIteracion.addEventListener("change", async () => {
+  if (!checkboxIteracion.checked) {
+    boxProyectoBase.classList.add("oculto");
+    return;
+  }
+  boxProyectoBase.classList.remove("oculto");
+  selectProyectoBase.innerHTML = `<option value="">Cargando...</option>`;
+  try {
+    const { proyectos } = await apiGet("/api/proyectos");
+    selectProyectoBase.innerHTML = proyectos.length
+      ? proyectos.map((p) => `<option value="${p}">${p}</option>`).join("")
+      : `<option value="">(no hay proyectos existentes todavía)</option>`;
+  } catch (e) {
+    selectProyectoBase.innerHTML = `<option value="">(error cargando proyectos: ${e.message})</option>`;
+  }
+});
 
 const formAnalizar = document.getElementById("form-analizar");
 formAnalizar.addEventListener("submit", async (ev) => {
@@ -67,23 +98,34 @@ formAnalizar.addEventListener("submit", async (ev) => {
   const datosForm = new FormData(formAnalizar);
   const proyecto = datosForm.get("proyecto").trim();
   if (!proyecto) return;
+  proyectoActual = proyecto;
+
+  // Si la persona no tildo "Es una nueva iteracion", no mandar
+  // proyecto_base aunque el <select> tenga algun valor cargado de un
+  // tilde anterior (evita mandar un dato que la persona ya no quiere).
+  if (!checkboxIteracion.checked) {
+    datosForm.delete("proyecto_base");
+  } else if (!datosForm.get("proyecto_base")) {
+    alert("Tildaste 'nueva iteración' pero no elegiste un proyecto base.");
+    return;
+  }
 
   document.getElementById("analizar-estado").classList.remove("oculto");
   document.getElementById("analizar-fase").textContent = "enviando...";
   document.getElementById("analizar-mensaje").textContent = "";
-  document.getElementById("analizar-prompt-box").classList.add("oculto");
   document.getElementById("analizar-log").textContent = "";
+  document.getElementById("explorar-box").classList.add("oculto");
 
   try {
     await apiPost("/api/proyectos/analizar", datosForm, true);
-    pollearEstadoAnalizar(proyecto);
+    pollearEstadoCarga(proyecto);
   } catch (e) {
     document.getElementById("analizar-fase").textContent = "error";
     document.getElementById("analizar-mensaje").textContent = e.message;
   }
 });
 
-function pollearEstadoAnalizar(proyecto) {
+function pollearEstadoCarga(proyecto) {
   const tick = async () => {
     let datos;
     try {
@@ -99,10 +141,9 @@ function pollearEstadoAnalizar(proyecto) {
     document.getElementById("analizar-log").textContent = (datos.log || []).join("\n");
     document.getElementById("analizar-log").scrollTop = 1e9;
 
-    if (datos.fase === "exploracion_manual_pendiente" && datos.prompt_exploracion) {
-      const box = document.getElementById("analizar-prompt-box");
-      box.classList.remove("oculto");
-      document.getElementById("analizar-prompt-texto").value = datos.prompt_exploracion;
+    if (datos.fase === "bootstrap_ok") {
+      document.getElementById("explorar-box").classList.remove("oculto");
+      return; // carga lista - esperar al clic de "2. Explorar con IA", no seguir poleando sola
     }
 
     if (!FASES_TERMINALES.has(datos.fase)) {
@@ -112,8 +153,61 @@ function pollearEstadoAnalizar(proyecto) {
   tick();
 }
 
-document.getElementById("analizar-copiar").addEventListener("click", () => {
-  const texto = document.getElementById("analizar-prompt-texto");
+document.getElementById("explorar-boton").addEventListener("click", async () => {
+  if (!proyectoActual) return;
+
+  document.getElementById("explorar-estado").classList.remove("oculto");
+  document.getElementById("explorar-fase").textContent = "enviando...";
+  document.getElementById("explorar-mensaje").textContent = "";
+  document.getElementById("explorar-prompt-box").classList.add("oculto");
+  document.getElementById("explorar-log").textContent = "";
+
+  try {
+    await apiPost(`/api/proyectos/${encodeURIComponent(proyectoActual)}/explorar`, {}, false);
+    pollearEstadoExplorar(proyectoActual);
+  } catch (e) {
+    document.getElementById("explorar-fase").textContent = "error";
+    document.getElementById("explorar-mensaje").textContent = e.message;
+  }
+});
+
+function pollearEstadoExplorar(proyecto) {
+  const tick = async () => {
+    let datos;
+    try {
+      datos = await apiGet(`/api/estado/${encodeURIComponent(proyecto)}`);
+    } catch (e) {
+      document.getElementById("explorar-mensaje").textContent = `(no se pudo consultar el estado: ${e.message})`;
+      setTimeout(tick, 12000);
+      return;
+    }
+
+    document.getElementById("explorar-fase").textContent = datos.fase || "—";
+    document.getElementById("explorar-mensaje").textContent = datos.mensaje || "";
+    document.getElementById("explorar-log").textContent = (datos.log || []).join("\n");
+    document.getElementById("explorar-log").scrollTop = 1e9;
+
+    if (datos.fase === "exploracion_manual_pendiente" && datos.prompt_exploracion) {
+      const box = document.getElementById("explorar-prompt-box");
+      box.classList.remove("oculto");
+      document.getElementById("explorar-prompt-texto").value = datos.prompt_exploracion;
+    }
+
+    if (!FASES_TERMINALES.has(datos.fase)) {
+      setTimeout(tick, 12000);
+    }
+  };
+  tick();
+}
+
+document.getElementById("explorar-copiar").addEventListener("click", () => {
+  const texto = document.getElementById("explorar-prompt-texto");
+  texto.select();
+  navigator.clipboard?.writeText(texto.value).catch(() => document.execCommand("copy"));
+});
+
+document.getElementById("ejecutar-copiar").addEventListener("click", () => {
+  const texto = document.getElementById("ejecutar-prompt-texto");
   texto.select();
   navigator.clipboard?.writeText(texto.value).catch(() => document.execCommand("copy"));
 });
@@ -153,6 +247,7 @@ document.getElementById("ejecutar-boton").addEventListener("click", async () => 
   document.getElementById("ejecutar-mensaje").textContent = "";
   document.getElementById("ejecutar-log").textContent = "";
   document.getElementById("ejecutar-progreso-box").classList.add("oculto");
+  document.getElementById("ejecutar-prompt-box").classList.add("oculto");
 
   try {
     await apiPost(`/api/ejecutar/${encodeURIComponent(proyecto)}`, { rf: rfSeleccionados, video });
@@ -188,10 +283,21 @@ function pollearEstadoEjecutar(proyecto) {
       document.getElementById("ejecutar-progreso-texto").textContent = `${prog.actual}/${prog.total} — ${prog.cp_actual || ""}`;
     }
 
+    if (datos.prompt_ejecucion) {
+      const box = document.getElementById("ejecutar-prompt-box");
+      box.classList.remove("oculto");
+      document.getElementById("ejecutar-prompt-texto").value = datos.prompt_ejecucion;
+    }
+
     if (datos.fase === "listo") {
-      mostrarVista("reporte");
-      document.getElementById("reporte-proyecto").value = proyecto;
-      cargarReporte(proyecto);
+      // Si hubo fallos (prompt_ejecucion presente), nos quedamos en esta
+      // vista para que el prompt sea visible - no saltar solos al
+      // reporte, que tapa el cuadro de ayuda.
+      if (!datos.prompt_ejecucion) {
+        mostrarVista("reporte");
+        document.getElementById("reporte-proyecto").value = proyecto;
+        cargarReporte(proyecto);
+      }
       return;
     }
     if (!FASES_TERMINALES.has(datos.fase)) {

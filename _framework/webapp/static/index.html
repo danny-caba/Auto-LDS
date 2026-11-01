@@ -20,11 +20,11 @@
 
   <!-- Vista: Nuevo proyecto -->
   <section id="vista-nuevo" class="vista">
-    <h2>Subir documentos y analizar</h2>
+    <h2>Subir documentos</h2>
     <form id="form-analizar">
       <label>
         Código de proyecto
-        <input type="text" name="proyecto" placeholder="PR000456 o PR000456-SP1" required pattern="PR\d{6}(-SP\d+)?">
+        <input type="text" name="proyecto" placeholder="PR000456, IP000456 o MS000456 (con -SPn opcional)" required pattern="(PR|IP|MS)\d{6}(-SP\d+)?">
       </label>
       <label>
         Matriz de casos (Excel) <span class="req">*</span>
@@ -42,18 +42,37 @@
         Documentos adicionales (opcional — manuales de usuario, PDFs, etc. Podés seleccionar varios a la vez)
         <input type="file" name="extra" accept=".pdf,.docx,.doc,.xlsx,.txt" multiple>
       </label>
-      <button type="submit">Analizar</button>
+      <label class="checkbox-line">
+        <input type="checkbox" id="es-iteracion">
+        Es una nueva iteración de un proyecto existente
+      </label>
+      <label id="proyecto-base-box" class="oculto">
+        Proyecto base (se copia su generate_scripts.py)
+        <select id="proyecto-base" name="proyecto_base"></select>
+      </label>
+      <button type="submit">1. Cargar documentos</button>
     </form>
 
     <div id="analizar-estado" class="caja-estado oculto">
       <p><strong>Fase:</strong> <span id="analizar-fase">—</span></p>
       <p id="analizar-mensaje"></p>
-      <div id="analizar-prompt-box" class="oculto">
-        <p>El CLI de Claude Code no está instalado en esta máquina — pegá este prompt en una sesión interactiva, en la carpeta del proyecto:</p>
-        <textarea id="analizar-prompt-texto" readonly rows="12"></textarea>
-        <button id="analizar-copiar" type="button">Copiar al portapapeles</button>
-      </div>
       <pre id="analizar-log" class="log"></pre>
+    </div>
+
+    <div id="explorar-box" class="caja-estado oculto">
+      <p>Carga completa. La exploración/generación de casos con IA es un paso SEPARADO — no se dispara sola.</p>
+      <button id="explorar-boton" type="button">2. Explorar con IA</button>
+
+      <div id="explorar-estado" class="caja-estado oculto">
+        <p><strong>Fase:</strong> <span id="explorar-fase">—</span></p>
+        <p id="explorar-mensaje"></p>
+        <div id="explorar-prompt-box" class="oculto">
+          <p>El CLI de Claude Code no está instalado en esta máquina — pegá este prompt en una sesión interactiva, en la carpeta del proyecto:</p>
+          <textarea id="explorar-prompt-texto" readonly rows="12"></textarea>
+          <button id="explorar-copiar" type="button">Copiar al portapapeles</button>
+        </div>
+        <pre id="explorar-log" class="log"></pre>
+      </div>
     </div>
   </section>
 
@@ -77,6 +96,11 @@
       <div id="ejecutar-progreso-box" class="oculto">
         <progress id="ejecutar-progreso" max="1" value="0"></progress>
         <span id="ejecutar-progreso-texto"></span>
+      </div>
+      <div id="ejecutar-prompt-box" class="oculto">
+        <p>Algún caso no dio OK — pegá este prompt en una sesión de Claude Code para diagnosticar/corregir:</p>
+        <textarea id="ejecutar-prompt-texto" readonly rows="10"></textarea>
+        <button id="ejecutar-copiar" type="button">Copiar al portapapeles</button>
       </div>
       <pre id="ejecutar-log" class="log"></pre>
     </div>
