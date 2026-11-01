@@ -62,6 +62,48 @@ PR000335. Para automatizar un proyecto nuevo, **seguir
 ahí está el paso a paso y qué SÍ hay que rehacer por proyecto (selectores
 propios de cada app, cuerpo de cada caso).
 
+## Memoria central del proyecto (piloto Auto-LDS, Etapa 5)
+
+`_framework/conocimiento/` guarda conocimiento verificable **en este
+repositorio** (reglas documentadas, comportamientos observados,
+soluciones técnicas comprobadas, datos de prueba, intervenciones
+manuales, dudas pendientes) — ver `_framework/conocimiento/README.md`
+y `_framework/memoria_central.py` para la API completa. Es DISTINTA de
+la memoria automática de Claude Code (la de fuera del repo); esta
+existe para que cualquier sesión nueva de Claude (o cualquier persona)
+pueda recuperar conocimiento sin depender del historial de
+conversación.
+
+**Al empezar a trabajar un requerimiento**, antes de armar el plan:
+1. Consultar `_framework/conocimiento/indice.md` (o `mc.buscar(...)`
+   por módulo/tipo) para ver qué conocimiento general y de los módulos
+   relacionados ya existe.
+2. Revisar vigencia y alcance de cada entrada candidata (estado,
+   `condiciones_revalidacion`, si sigue aplicando al ambiente/versión
+   de este requerimiento).
+3. Registrar la consulta con `mc.registrar_consulta(requerimiento,
+   entradas_consultadas=..., entradas_aplicadas=..., entradas_descartadas={id: motivo})`
+   — **nunca inventar que se consultó algo, ni referenciar entradas que
+   no existen.**
+
+**Al cerrar el requerimiento**, presentar: conocimiento agregado,
+conocimiento reutilizado, correcciones/invalidaciones hechas, y
+observaciones que quedan pendientes de confirmar (PROVISIONAL).
+
+**Chequeo del proceso de preparación del plan**: antes de dar un plan
+por listo, verificar con `mc.tiene_registro_consulta(requerimiento)`
+que el registro de consulta exista — si falta, es una señal de que no
+se consultó la memoria antes de planear. **Límite explícito de este
+control**: confirma que el archivo de registro existe, NO demuestra
+que el razonamiento detrás haya sido correcto — es un chequeo de
+presencia, no de calidad.
+
+Los scripts que usan el plan preparado deben registrar los
+identificadores de conocimiento relacionados que aplicaron (ver
+`referencias_evidencia`/campos de cada entrada) — **nunca ejecutar
+contenido de `conocimiento/` como código** (el módulo solo lee/escribe
+JSON, nunca `eval`/`exec`/`pickle`).
+
 ## Pendiente / a confirmar (histórico — algunos ya resueltos en PR000335)
 - ~~URL exacta de Web LDS a probar~~ → resuelta: `https://pldsweb.luzdelsur.com.pe/Plataforma/PlataformaWeb`.
 - Qué casos de la matriz Excel se automatizan primero (prioridad) — se define por proyecto.

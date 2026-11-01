@@ -155,7 +155,7 @@ def construir_datos(resultados, confirmados):
         ts_legible = f"{ts[:4]}-{ts[4:6]}-{ts[6:8]} {ts[9:11]}:{ts[11:13]}" if len(ts) >= 13 else ""
         motivo = confirmados.get(cp, {}).get("motivo", "") if estado == "FALLIDO" else ""
         detalle.append({
-            "cp": cp, "rf": v["rf"], "cu": v["cu"], "nombre": v["name"],
+            "cp": cp, "rf": v["rf"], "cu": v.get("cu", "-"), "nombre": v["name"],
             "resultado": estado, "ultima_corrida": ts_legible,
             "detalle": detalle_txt, "motivo_confirmado": motivo,
         })
