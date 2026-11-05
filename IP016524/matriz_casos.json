@@ -1,0 +1,24 @@
+{
+  "CP001": {
+    "rf": "IP016524",
+    "cu": "-",
+    "cp": "CP001",
+    "name": "Cambio de razón social con RUC de distrito Magdalena del Mar",
+    "desc": "Verificar que al consultar un RUC cuyo domicilio fiscal corresponde a un distrito cuya descripción en el catálogo no coincide con la del padrón de SUNAT (caso Magdalena del Mar, ubigeo 150120), el sistema valida el distrito por el código de ubigeo (ya no por la descripción) y obtiene la razón social sin mostrar el error \"No se ubico el Distrito.\".",
+    "precond": "Backend ConsultaPersonaExterno desplegado en el ambiente que se esté probando, con la validación de distrito por ubigeo. Usuario con acceso al módulo Modificaciones Generales en Pruebas. Cliente jurídico existente en el ambiente de Pruebas.",
+    "datos": "N° cliente: Cliente jurídico que exista en pruebas (405351) \nTipo de documento: RUC\nN° documento: 20509514641 (FENIX POWER PERU S.A., ubigeo 150120 - Magdalena del Mar)\n\nNota: El RUC 20509514641 (Magdalena del Mar) es el caso de referencia; pueden usarse otros RUC cuyo distrito presente el mismo patrón (descripción del catálogo distinta a la del padrón, u homónima), p. ej. Lima (ubigeo 150101), Ate (150103) o Lurigancho (150118).",
+    "esperado": "Se muestra la ventana \"¿La información obtenida del RUC es correcta?\" con la razón social correspondiente. No se muestra el mensaje \"Atención: No se ubico el Distrito.\".",
+    "pasos": "1. Ingresar al módulo Modificaciones Generales.\n2. Cargar el número de cliente (405351).\n3. En Tipo Doc. Identidad seleccionar RUC.\n4. Ingresar el N° de documento de RUC cuyo distrito presente el caso de tener una descripción del catálogo distinta a la del padrón (El caso del error reportado es el RUC 20509514641).\n5. Salir del campo (Tab o clic).\n6. Confirmar la ventana con los datos obtenidos."
+  },
+  "CP002": {
+    "rf": "IP016524",
+    "cu": "-",
+    "cp": "CP002",
+    "name": "Consulta de RUC de distrito normal (sin discrepancia en el catálogo)",
+    "desc": "Verificar que al consultar un RUC cuyo domicilio fiscal corresponde a un distrito cuya descripción en el catálogo SÍ coincide con la del padrón (caso San Isidro, ubigeo 150131), el sistema sigue obteniendo la razón social y el distrito correctamente, sin ningún mensaje de error. Confirma que la validación por ubigeo no afectó los casos que ya funcionaban.",
+    "precond": "Backend ConsultaPersonaExterno desplegado en el ambiente que se esté probando con la validación de distrito por ubigeo. Usuario con acceso al módulo Modificaciones Generales en Pruebas. Cliente jurídico existente en el ambiente de Pruebas.",
+    "datos": "N° cliente: (el mismo cliente jurídico) 405351\nTipo de documento: RUC\nN° documento: 20100041953 (RIMAC SEGUROS Y REASEGUROS, ubigeo 150131 - San Isidro)",
+    "esperado": "Se muestra la ventana \"¿La información obtenida del RUC es correcta?\" con la razón social \"RIMAC SEGUROS Y REASEGUROS\" y su dirección. No se muestra ningún mensaje de error.",
+    "pasos": "1. Ingresar al módulo Modificaciones Generales.\n2. Cargar el número de cliente (405351).\n3. En Tipo Doc. Identidad seleccionar RUC.\n4. Ingresar el N° de documento 20100041953.\n5. Salir del campo (Tab o clic).\n6. Confirmar la ventana con los datos obtenidos."
+  }
+}

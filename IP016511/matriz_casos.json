@@ -1,0 +1,13 @@
+{
+  "CP01": {
+    "rf": "RF1",
+    "cu": "CU1",
+    "cp": "CP01",
+    "name": "Registro de Venta Web",
+    "desc": "Validar que se apliquen la regla de solo números y con una longitud de máximo 7 caracteres al campo Nro. Solicitud (SST)",
+    "precond": "rol funcional\nEMI.DIGITACION\n\nAccesos a los libros de venta 102",
+    "datos": "Para el registro usar estas características:\nLibro: 102\nOperación Comercial: ZV01\nSuministro: 400198, 1280938, 807980, 574822, 271878, 274574, 424781, 424785, 424786 y 424787\nCr: 23510 (Chacarilla)\nProducto: 5103",
+    "esperado": "Valide que cuando copio o Pego y al grabar no permita que se registre para el campo Nro. Solicitud (SST) un valor no numérico y que sea mas de 7 dígitos. Actualmente solo valida al digitar manualmente, pero no al copiar desde el portapapeles.\n\nAl ejecutar el portapapeles solo debe copiar los caracteres numéricos hasta un máximo de 7 dígitos.",
+    "pasos": "1. Ingresar a https://pldsweb.luzdelsur.com.pe/Plataforma/PlataformaWeb/\n2. Opción Emisión Documentos Venta\n3. Clic en el botón Agregar Nuevo\n4. Ingresamos el libro 102 y tipo documento\n5. Ingresamos a campo Nro. Solicitud (SST) con el portapapeles un valor no numérico. Solo debe copiar del portapapeles caracteres numéricos con un tope de 7 dígitos, los que excedan no se copiaran.\n6. Agregar el producto 5103, CR 23510 Y ope. Comercial ZV01. Completamos los demás datos que solicitan.\n7. Clic en Grabar\n8. Esperamos la respuesta del servicio con el OK."
+  }
+}
