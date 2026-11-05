@@ -11,6 +11,7 @@
   <h1>Automatización de Pruebas — Web LDS</h1>
   <nav class="tabs">
     <button class="tab-btn" data-vista="nuevo" type="button">Nuevo proyecto</button>
+    <button class="tab-btn" data-vista="excel" type="button">Excel</button>
     <button class="tab-btn" data-vista="ejecutar" type="button">Ejecutar pruebas</button>
     <button class="tab-btn" data-vista="reporte" type="button">Reporte</button>
   </nav>
@@ -24,7 +25,7 @@
     <form id="form-analizar">
       <label>
         Código de proyecto
-        <input type="text" name="proyecto" placeholder="PR000456, IP000456 o MS000456 (con -SPn opcional)" required pattern="(PR|IP|MS)\d{6}(-SP\d+)?">
+        <input type="text" name="proyecto" placeholder="PR000456, IP000456 o MS000456 (con -SPn y/o -ITn opcional)" required pattern="(PR|IP|MS)\d{6}(-SP\d+)?(-IT\d+)?">
       </label>
       <label>
         Matriz de casos (Excel) <span class="req">*</span>
@@ -74,6 +75,19 @@
         <pre id="explorar-log" class="log"></pre>
       </div>
     </div>
+  </section>
+
+  <!-- Vista: Excel -->
+  <section id="vista-excel" class="vista oculto">
+    <h2>Matriz de casos de prueba</h2>
+    <label>
+      Proyecto
+      <select id="excel-proyecto"></select>
+    </label>
+    <p id="excel-descarga-box" class="oculto">
+      <a id="excel-descarga" href="#" target="_blank">Descargar el Excel original</a>
+    </p>
+    <div id="excel-contenido"></div>
   </section>
 
   <!-- Vista: Ejecutar pruebas -->

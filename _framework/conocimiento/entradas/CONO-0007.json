@@ -1,0 +1,21 @@
+{
+  "id": "CONO-0007",
+  "tipo": "DATO_DE_PRUEBA",
+  "descripcion": "Cliente de Pruebas reutilizable para la pantalla Informacion General: numero 15 = TOWER AND TOWER S.A. (RUC 20380618797), email de prueba test1_cv@luzdelsur.com.pe, deuda total 473.70, con Bloqueo de Corte activo y un Rol de corte DACD. Confirmado 2 veces en vivo (CP001/CP002, ambos APROBADO).",
+  "modulo": "atencion-integral-informacion-general",
+  "ambiente": null,
+  "version": null,
+  "fuente": "Exploracion en vivo 31/10/2026 + corrida real CP001/CP002",
+  "requerimiento_origen": "MS024472",
+  "referencias_evidencia": [
+    "MS024472/resultados/20261031_160454/CP001/1/resultado.json",
+    "MS024472/resultados/20261031_160454/CP002/1/resultado.json"
+  ],
+  "estado": "VERIFICADO",
+  "fecha_creacion": "2026-10-31",
+  "fecha_ultima_verificacion": "2026-10-31",
+  "condiciones_revalidacion": null,
+  "reemplaza": null,
+  "reemplazada_por": null,
+  "motivo_invalidacion": null
+}

@@ -1,77 +1,57 @@
 {
-  "CP008": {
-    "motivo": "Servicio externo de generación de reportes no disponible en Pruebas: 'No se generó informe.' (confirmado 3/3, coincide con riesgo ya documentado en el EF Sección 11).",
-    "fecha_verificacion": "2026-09-27",
-    "evidencia": "run_all.py --solo CP008 (ver reportes/logs/CP008.log)"
-  },
   "CP039": {
-    "motivo": "Contradice el supuesto de la matriz: 'Leer' con filtro por defecto (Estado=Activos) da 'Demasiados registros para ser mostrados en la grilla.' (RN-03) - el universo real de activos en Pruebas supera 2000 registros.",
-    "fecha_verificacion": "2026-09-28",
-    "evidencia": "_exploracion/explore_45_rf06_completo.py"
+    "motivo": "2 DEFECTOS REALES ASOCIADOS. (1) HTTP 400: 'Leer' con filtro por defecto (Estado=Activos, sin otro filtro) da 'Demasiados registros para ser mostrados en la grilla.' porque el backend (POST .../inspector/web/api/inspector/Leer) responde HTTP 400 — el universo real de activos en Pruebas supera 2000 registros. Re-verificado 02/11/2026 incluso acotando por Proveedor = Luz del Sur (20331898008, el propio dueño del sistema): mismo HTTP 400. (2) CAUSA RAÍZ — filas duplicadas: con Proveedor=Luz del Sur + Estado=Noactivos (combo que SÍ queda bajo el límite, 116 registros declarados), de 100 filas del primer bloque solo hay 4 códigos de inspector reales distintos (922, 315, 314, 305), repetidos 13-29 veces cada uno — probable JOIN del backend sin deduplicar. El conteo de 'demasiados registros' del defecto (1) está inflado por esta misma duplicación.",
+    "fecha_verificacion": "2026-11-02",
+    "evidencia": "_exploracion/explore_69_rf06_cp039_revalidar.py, explore_70_rf06_cp039_proveedor_lds.py, explore_71_rf06_cp039_status_code.py, explore_75_rf06_cp041_duplicados.py"
   },
   "CP041": {
-    "motivo": "No se encontró un filtro real que devuelva entre 100 y 2000 registros (rango exacto para probar paginación 'Siguientes').",
-    "fecha_verificacion": "2026-09-28",
-    "evidencia": "Exploración RF-06 (Mantenedor de Inspectores de Corte)"
-  },
-  "CP044": {
-    "motivo": "Verificado manualmente OK ('Eliminación realizada Satisfactoriamente.') pero no se deja como caso automatizado repetible: la Baja no tiene reversión en la UI y Alta (que generaría datos descartables) está bloqueada por el servicio de ficha caído.",
-    "fecha_verificacion": "2026-09-28",
-    "evidencia": "_exploracion/explore_55_56_rf06_eliminar_2408.py"
-  },
-  "CP045": {
-    "motivo": "Sin un 2do registro de prueba descartable disponible (Alta bloqueada, único conocido -2408- ya usado en CP044).",
-    "fecha_verificacion": "2026-09-28",
-    "evidencia": "Ver CP044/CP046-047"
-  },
-  "CP046": {
-    "motivo": "DEFECTO/BLOQUEO REAL: el servicio externo de validación de ficha falla igual con una ficha inventada (999001) o una ficha real ya asignada (4504) - 'Error de Servicio: Error al validar la ficha.' Coincide con riesgo ya documentado en el EF Sección 11.",
-    "fecha_verificacion": "2026-09-28",
-    "evidencia": "_exploracion/explore_58_rf06_cp046_solo.py"
+    "motivo": "DEFECTO REAL: el botón 'Siguientes' ignora el filtro vigente. Con Proveedor=Luz del Sur (20331898008) + Sucursal=Chacarilla (3100) + Estado=Noactivos, el primer bloque es correcto (100 de 116, todas Estado=NoActivo/Sucursal=Chacarilla), pero al presionar Siguientes el pie salta a '200 de 116' (contradictorio con su propio total) y las filas nuevas son Estado=Activo + Sucursal='Sin Sucursal' — datos de otro filtro completamente distinto, mientras la etiqueta 'Filtro vigente' no cambia. No se pudo validar la regla original ('Siguientes agrega el siguiente bloque sin repetir la consulta') porque Siguientes no reusa el filtro original.",
+    "fecha_verificacion": "2026-11-02",
+    "evidencia": "_exploracion/explore_76_rf06_siguientes_rompe_filtro.py"
   },
   "CP047": {
-    "motivo": "Mismo bloqueo que CP046: el servicio de validación de ficha (correlativo + área por sucursal) está caído - cualquier Alta falla antes de evaluar la regla de negocio.",
-    "fecha_verificacion": "2026-09-28",
-    "evidencia": "_exploracion/explore_51_rf06_alta_todas_sucursales.py"
+    "motivo": "El servicio de validación de ficha ya funciona (recuperado, re-verificado 02/11/2026 en CP046 — mismo patrón de recuperación que CP008/CP039). Sigue bloqueado por falta de dato: hace falta una ficha real VÁLIDA que todavía NO sea un inspector existente, para completar un Alta exitosa de punta a punta (escritura permanente, sin reversión en la UI). Pendiente que el usuario indique una ficha real disponible.",
+    "fecha_verificacion": "2026-11-02",
+    "evidencia": "_exploracion/explore_51_rf06_alta_todas_sucursales.py, explore_85_rf06_cp046_ficha.py"
   },
-  "CP048": {
-    "motivo": "Verificado manualmente OK (Sucursal/Área confirmadas sin cambios pese a modificar el combo) pero no automatizado: requiere modificar temporalmente un inspector real y restaurarlo - riesgo de dejar datos reales modificados si el paso de restauración falla.",
-    "fecha_verificacion": "2026-09-28",
-    "evidencia": "_exploracion/explore_53_rf06_modificar_2408.py, explore_59..61_rf06_*.py"
+  "CP009": {
+    "motivo": "DEFECTO REAL H001: el camino 'esCreador' de Mantenimiento de Órdenes de Conexión es estructuralmente inalcanzable con datos reales de Pruebas. Probados 54 clientes reales (BD real, ambos estados de traspaso 'A'=anulada y 'S'=guarda activa, datos aportados por el usuario) — el 100% está bloqueado por 'El NUCLI fue generado por el ACTICOME, favor trabajar en dicho módulo'. Se forzó además rol_creacion='DACD' (rol real de sesión de DCABA_DW) vía UPDATE directo en BD sobre un cliente real: el bloqueo de ACTICOME persiste igual, confirmando que es una compuerta independiente de rol_creacion. No se identificó la columna real que controla el bloqueo (se revisó el código fuente real de ACTICOME, BoActicome.cs:4165 InsertarEstoc_BO, pero solo descarta que sea 'traspaso').",
+    "fecha_verificacion": "2026-11-02",
+    "evidencia": "_exploracion/explore_101_rf02_cp011_cp014.py, explore_102_rf02_validar_update_1603071.py"
   },
-  "CP052": {
-    "motivo": "DEFECTO REAL: ingresar una fecha calendario válida en el nz-date-picker congela la pantalla por completo (reproducido 5 veces, distintos métodos de interacción, sin recuperación ni con 100s+ de espera).",
-    "fecha_verificacion": "2026-09-28",
-    "evidencia": "_exploracion/explore_21..27_rf07_*.py, explore_38_rf07_espera_larga.py"
+  "CP011": {
+    "motivo": "BLOQUEADO por el defecto real H001 (ver CP009) — depende de pasar la misma compuerta de ACTICOME.",
+    "fecha_verificacion": "2026-11-02",
+    "evidencia": "Ver CP009"
   },
-  "CP053": {
-    "motivo": "Mismo defecto real de CP052 (nz-date-picker congela la pantalla).",
-    "fecha_verificacion": "2026-09-28",
-    "evidencia": "_exploracion/explore_21..27_rf07_*.py"
+  "CP012": {
+    "motivo": "BLOQUEADO por el defecto real H001 (ver CP009) — depende de pasar la misma compuerta de ACTICOME.",
+    "fecha_verificacion": "2026-11-02",
+    "evidencia": "Ver CP009"
   },
-  "CP064": {
-    "motivo": "DEFECTO REAL confirmado en una 2da pantalla distinta (Consulta Genérica de Reposiciones) - mismo defecto de nz-date-picker que congela la pantalla.",
-    "fecha_verificacion": "2026-09-28",
-    "evidencia": "_exploracion/explore_28..31_rf09_*.py"
+  "CP013": {
+    "motivo": "BLOQUEADO por el defecto real H001 (ver CP009) — depende de pasar la misma compuerta de ACTICOME.",
+    "fecha_verificacion": "2026-11-02",
+    "evidencia": "Ver CP009"
   },
-  "CP068": {
-    "motivo": "Mismo defecto real de CP064 (nz-date-picker congela la pantalla).",
-    "fecha_verificacion": "2026-09-28",
-    "evidencia": "_exploracion/explore_28..31_rf09_*.py"
+  "CP014": {
+    "motivo": "BLOQUEADO por el defecto real H001 (ver CP009) — depende de pasar la misma compuerta de ACTICOME.",
+    "fecha_verificacion": "2026-11-02",
+    "evidencia": "Ver CP009"
   },
-  "CP069": {
-    "motivo": "Mismo defecto real de CP064 (nz-date-picker congela la pantalla).",
-    "fecha_verificacion": "2026-09-28",
-    "evidencia": "_exploracion/explore_28..31_rf09_*.py"
+  "CP015": {
+    "motivo": "BLOQUEADO por el defecto real H001 (ver CP009) — depende de pasar la misma compuerta de ACTICOME.",
+    "fecha_verificacion": "2026-11-02",
+    "evidencia": "Ver CP009"
   },
-  "CP070": {
-    "motivo": "Mismo defecto real de CP064 (nz-date-picker congela la pantalla).",
-    "fecha_verificacion": "2026-09-28",
-    "evidencia": "_exploracion/explore_28..31_rf09_*.py"
+  "CP016": {
+    "motivo": "BLOQUEADO por el defecto real H001 (ver CP009) — depende de pasar la misma compuerta de ACTICOME.",
+    "fecha_verificacion": "2026-11-02",
+    "evidencia": "Ver CP009"
   },
-  "CP071": {
-    "motivo": "Mismo defecto real de CP064 (nz-date-picker congela la pantalla).",
-    "fecha_verificacion": "2026-09-28",
-    "evidencia": "_exploracion/explore_28..31_rf09_*.py"
+  "CP072": {
+    "motivo": "BLOQUEADO por el defecto real H001 (ver CP009) — depende de pasar la misma compuerta de ACTICOME.",
+    "fecha_verificacion": "2026-11-02",
+    "evidencia": "Ver CP009"
   }
 }

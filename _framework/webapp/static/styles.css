@@ -126,6 +126,9 @@ table.reporte th, table.reporte td {
   text-align: left;
 }
 table.reporte th { background: var(--azul); color: white; }
+table.reporte .col-pasos { min-width: 22rem; }
+table.reporte .col-pasos div { margin-bottom: 0.25rem; }
+table.reporte .col-pasos div:last-child { margin-bottom: 0; }
 tr.rf-header td { background: var(--gris); font-weight: bold; }
 
 .estado-OK { background: var(--verde); color: var(--verde-txt); font-weight: bold; text-align: center; }

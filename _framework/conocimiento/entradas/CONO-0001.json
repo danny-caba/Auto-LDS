@@ -1,0 +1,21 @@
+{
+  "id": "CONO-0001",
+  "tipo": "SOLUCION_TECNICA_COMPROBADA",
+  "descripcion": "En la pantalla de consulta de producto (pagina de juguete _exploracion/pagina_local_ejemplo.html), page.fill('#codigo', codigo) + page.click('#buscar') alcanza: el texto de #resultado ya esta listo apenas vuelve click() porque la pagina es 100% sincronica (sin llamadas de red) - no hace falta esperar networkidle ni agregar un wait_for_timeout extra.",
+  "modulo": "consulta-producto-local",
+  "ambiente": null,
+  "version": null,
+  "fuente": "Etapa 4 - validar_intervencion_local.py (casos CPL01/CPL02, ambos APROBADO)",
+  "requerimiento_origen": "MS024472",
+  "referencias_evidencia": [
+    "MS024472/resultados_TEST_INTERVENCION/*/CPL01/*/resultado.json",
+    "MS024472/_exploracion/pagina_local_ejemplo.html"
+  ],
+  "estado": "VERIFICADO",
+  "fecha_creacion": "2026-10-31",
+  "fecha_ultima_verificacion": "2026-10-31",
+  "condiciones_revalidacion": "Revalidar si la pagina de ejemplo pasa a tener alguna llamada async (fetch/XHR).",
+  "reemplaza": null,
+  "reemplazada_por": null,
+  "motivo_invalidacion": null
+}

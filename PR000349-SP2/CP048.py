@@ -529,17 +529,18 @@ def _unir_videos(destino, *videos, timeout_seg=60):
 # impresion de que la app no reacciono a un cambio que en realidad nunca
 # se escribio.
 #
-# **"Imprimir" (generacion de informe) confirmado en vivo que SIEMPRE
-# falla con "No se generó informe."** (probado 3 veces, resultado
-# consistente, no transitorio - a diferencia del caso de PR000349-SP1
-# RF-09/RF-10 donde SI era transitorio). Esto coincide con un riesgo YA
-# documentado explicitamente en el EF (Seccion 11, Supuestos): "la
-# generación y descarga de informes de RF-01 ... depende de un servicio
-# de generación de reportes externo al alcance de este sprint; su
-# disponibilidad es un prerrequisito de cierre". El dialogo de
-# confirmacion previo ("¿Desea generar archivos?", botones Cancelar/
-# Aceptar) SI funciona normalmente - es solo la generacion real la que
-# falla, consistente con el servicio externo no disponible en Pruebas.
+# **CORRECCION 02/11/2026 - "Imprimir" (generacion de informe) NO esta
+# permanentemente caido, es simplemente MUY LENTO.** El hallazgo original
+# (27/09/2026, "SIEMPRE falla con 'No se generó informe.'", 3/3 veces) era
+# un falso negativo de automatizacion: las 3 verificaciones esperaron solo
+# unos pocos segundos tras confirmar "¿Desea generar archivos?". Con S.S.
+# 1234567 (2 clientes reales) y esperando hasta 240s, el informe SI se
+# genera y se descarga ("ODESS_Informe_1234567.txt" real confirmado en
+# vivo) - mismo patron de backend lento ya visto en RF-03 CP024 (hasta
+# ~220s). El dialogo de confirmacion previo ("¿Desea generar archivos?",
+# botones Cancelar/Aceptar) funciona normalmente. Cualquier automatizacion
+# futura de esta pantalla debe esperar en bucle (no un timeout corto fijo)
+# tras confirmar Imprimir.
 # ============================================================================
 #
 
@@ -668,6 +669,40 @@ def confirmar_imprimir(app, frame):
 # (rol JEFESUCU, ver CP072) o consiguiendo el dato por otra via (BD,
 # Desarrollo). Tampoco se encontro ningun cliente con orden YA ANULADA
 # (CP011) en el escaneo inicial de ~25 clientes conocidos del proyecto.
+#
+# **Segundo escaneo 02/11/2026 (16 clientes nuevos, sacados en vivo de RF-03
+# Consulta de Cortes y Reconexiones, rango 01/01/2023-15/01/2023, mismo
+# resultado negativo)**: de los 16, 12 bloqueados por ACTICOME, 2 sin
+# orden (245206, 483672), 2 con orden AJENA sin privilegio (1396651,
+# 1370862 - mismo patron que 1259207/1415959, "Sólo puede consultar"). CERO
+# con orden propia o ya anulada. Van 41 clientes escaneados en total entre
+# las dos sesiones sin encontrar un candidato natural.
+#
+# **DEFECTO REAL H001 CONFIRMADO 02/11/2026 - esCreador es estructuralmente
+# inalcanzable con datos reales de Pruebas.** El usuario aporto una query
+# directa real a `nucli`/`estoc` con 54 clientes en ambos estados de
+# `traspaso` ('A'=anulada, 'S'=guarda activa) - ver
+# _exploracion/explore_101_rf02_cp011_cp014.py: el 100% esta bloqueado por
+# "El NUCLI fue generado por el ACTICOME, favor trabajar en dicho módulo",
+# sin importar el estado de traspaso. Se probo ademas forzar
+# `rol_creacion='DACD'` (rol real de sesion de DCABA_DW, confirmado por el
+# usuario) via `UPDATE nucli SET rol_creacion='DACD' WHERE numero_cliente=
+# 1603071 AND numero_ss=880406 AND correlativo_ss=9;` sobre uno de esos
+# clientes reales - el bloqueo de ACTICOME PERSISTE IGUAL (ver
+# _exploracion/explore_102_rf02_validar_update_1603071.py), confirmando
+# que es una compuerta COMPLETAMENTE INDEPENDIENTE de `rol_creacion`. No
+# se identifico la columna real que la controla: se reviso el codigo
+# fuente real de ACTICOME (`backend/gestioncliente.acticome`,
+# `BoActicome.cs:4165 InsertarEstoc_BO`) pero esa investigacion solo
+# alcanzo a descartar que sea la columna `traspaso` (ver nota historica de
+# CP014 en matriz_casos.json), no identifico la columna real.
+# **Conclusion**: con 54 clientes reales de muestra + 1 intento de UPDATE
+# directo en BD, se considera H001 un defecto/bloqueo estructural de la
+# BD/ambiente de Pruebas (no un problema de automatizacion ni de falta de
+# intentos) - CP009 queda documentado como el defecto raiz, y CP011/
+# CP012-016/CP072 quedan BLOQUEADOS por el mismo defecto (todos dependen
+# de pasar esta misma compuerta antes de poder evaluar esCreador/
+# esPrivilegiado).
 #
 
 
@@ -1068,6 +1103,42 @@ def leer_pagos(app, frame):
 # vez - el de la pantalla principal y el del modal - hay que ESCOPEAR el
 # locator al overlay, si no Playwright tira "strict mode violation").
 #
+# **Gotcha de carga asincrona**: `#flt-proveedor` y `#flt-sucursal` nacen
+# con `disabled=""` hasta que termina de cargar su catalogo (servicio
+# async) - si se lee `option` antes de que se habiliten, solo aparece
+# "-- Todos --"/"-- Todas --". Esperar a `is_enabled()` antes de leer o
+# elegir una opcion (`#flt-estado` si tiene sus opciones fijas desde el
+# inicio, no necesita esta espera).
+#
+# **DEFECTO REAL MAYOR 1/2 confirmado en vivo 02/11/2026 (filas duplicadas
+# en la grilla de resultados)**: el backend de Leer/Filtrar devuelve el
+# mismo inspector repetido muchas veces en vez de una fila por inspector -
+# confirmado con Proveedor = Luz del Sur (20331898008) + Estado =
+# Noactivos: el primer bloque de 100 filas tiene solo 4 codigos reales
+# distintos (922, 315, 314, 305), repetidos 13-29 veces cada uno, fila
+# por fila identica. Esto es consistente con un `JOIN` del backend que
+# multiplica filas sin deduplicar, y explica tambien por que el filtro
+# por defecto (Estado=Activos, ver CP039) siempre excede el limite de
+# 2000 registros admitidos por la grilla - el conteo real de inspectores
+# distintos es probablemente mucho menor, pero el backend cuenta las
+# filas duplicadas. Afecta la confiabilidad de CUALQUIER conteo o
+# paginacion en esta pantalla - no es un problema puntual de un filtro.
+#
+# **DEFECTO REAL MAYOR 2/2 confirmado en vivo 02/11/2026 ("Siguientes"
+# ignora el filtro vigente)**: agregando Sucursal = Chacarilla (3100) al
+# filtro anterior (Proveedor=Luz del Sur + Estado=Noactivos), el PRIMER
+# bloque de 100 filas SI viene correcto (todas Estado=NoActivo,
+# Sucursal=Chacarilla, pie "100 de 116"). Al presionar **Siguientes**, el
+# pie salta a "200 de 116" (incoherente con el propio total declarado) y
+# las filas NUEVAS que agrega son Estado=Activo y Sucursal="0000 - Sin
+# Sucursal" - datos de un filtro completamente distinto - mientras la
+# etiqueta "Filtro vigente" sigue mostrando el filtro original sin avisar
+# del cambio. Conclusion: Siguientes NO reusa el filtro de la consulta
+# original, trae la pagina siguiente de una consulta distinta (posiblemente
+# sin filtro, o del ultimo filtro "por defecto"). Ambos defectos (1 y 2)
+# hacen que CUALQUIER resultado con mas de 1 pantalla de datos en esta
+# grilla sea potencialmente no confiable.
+#
 # **RN-01 confirmado**: al abrir, filtro vigente = "Estado = Activos", SIN
 # consulta automatica. Botones Siguientes/Limpiar/Detalles/Eliminar/Excel/
 # Imprimir arrancan `disabled`. Leer/Filtrar/Agregar SI estan habilitados.
@@ -1130,6 +1201,26 @@ def leer_pagos(app, frame):
 # ESCRITURA real sobre Pruebas** (dan de baja, crean o modifican
 # inspectores reales) - no se ejecutan sin coordinar antes con el usuario,
 # a diferencia de las consultas de solo lectura de este modulo.
+#
+# **Baja individual y masiva (CP044/CP045) CONFIRMADAS FUNCIONALES en vivo
+# 02/11/2026** con codigos reales indicados explicitamente por el usuario
+# en cada corrida (301 para individual; 303+304 para masiva) - ver
+# secuencia completa (incluye el 2do overlay "Modo: Baja" y el boton de
+# confirmacion real `button.conf-btn-ok`) en
+# _exploracion/explore_55_56_rf06_eliminar_2408.py (primer hallazgo,
+# 28/09) y las corridas reales de CP044/CP045 en PR000349-SP2
+# (generate_scripts.py). **Para marcar 2+ codigos especificos a la vez
+# (mass delete) cuando el filtro Codigo exacto solo admite 1 valor**:
+# usar un prefijo parcial (ej. "30") + Estado=Activos, y si los codigos
+# buscados no aparecen en el primer bloque de 100, presionar Siguientes
+# una vez (confirmado que el bloque acumulado de 200 SI trae codigos
+# distintos del prefijo) - cuidado de marcar EXCLUSIVAMENTE las filas de
+# los codigos buscados, el bloque trae varios codigos mezclados.
+# Sigue sin existir forma de generar un inspector descartable NUEVO
+# (Alta bloqueada, ver CP046/047) ni de revertir una baja - cada corrida
+# real de CP044/CP045 consume codigos reales que no vuelven a estar
+# disponibles, asi que para repetir estos casos en el futuro hace falta
+# que el usuario indique codigos Activos nuevos cada vez.
 # ============================================================================
 #
 
@@ -1220,23 +1311,19 @@ def filas_inspectores(frame):
 # cuenta como `<tr>` igual que la fila fantasma `ant-table-measure-now` -
 # excluir AMBAS siempre al contar filas reales.
 #
-# **DEFECTO REAL confirmado en vivo (28/09/2026): ingresar una fecha
-# CALENDARIO VALIDA en el filtro F. Corte congela la pantalla por
-# completo** - reproducido 5 veces con metodos de interaccion distintos
-# (`press_sequentially`, `.fill()`, click en el calendario visual sobre un
-# dia, click en el boton "Hoy") tanto en modo "=" como en modo "Entre".
-# Sintomas: cualquier operacion posterior sobre el popup (`screenshot()`,
-# `input_value()`, un nuevo `click()`) cuelga por 30s+ sin excepcion de
-# JS ni error de consola ni llamada de red disparada (se descarto que sea
-# un dialogo nativo bloqueante - no se detecto ninguno via
-# `page.on("dialog")`). La ventana PRINCIPAL del portal (`page`, fuera del
-# popup) sigue respondiendo con normalidad - el freeze es especifico del
-# popup/pantalla. Una fecha INVALIDA (ej. "31/02/2026") o dejar el campo
-# vacio NO producen el freeze (validan rapido, ver CP050/CP051). Esto
-# bloquea cualquier caso de este modulo que necesite una fecha REAL para
-# ejecutar una busqueda (ej. rango de fechas, filtro por fecha exacta
-# valida) - documentar como defecto real a reportar, no reintentar mas sin
-# un cambio real en el ambiente.
+# **CORRECCION 02/11/2026 - el freeze del date-picker YA NO SE REPRODUCE.**
+# El defecto original (28/09/2026: ingresar una fecha calendario VALIDA
+# en el filtro F. Corte congelaba la pantalla 30s+, reproducido 5 veces
+# con metodos de interaccion distintos) no se reproduce mas de un mes
+# despues - escribir la fecha con `press_sequentially`, hacer `screenshot()`
+# y leer `input_value()` terminan en <2s (ver
+# _exploracion/explore_88_rf07_revalidar_freeze.py). Mismo patron de
+# recuperacion ya visto en otras pantallas de PR000349-SP2 (servicio de
+# informes de RF-01, backend de RF-02/03/05, servicio de ficha de RF-06).
+# CP052/CP053 confirmados en vivo con los mensajes EXACTOS del EF
+# ("Debe Seleccionar Rango Superior de Fecha" / "Error, Rango de Fechas
+# Debe Ser Como Máximo 60 Días"). Los campos de fecha se ubican con
+# `frame.get_by_label("Fecha inicial")` / `"Fecha final"`.
 # ============================================================================
 #
 
@@ -1403,23 +1490,38 @@ def leer_reposicion_pendientes(app, frame):
 # - "Fecha Inválida" (RN-06, fecha con valor calendario inexistente)
 # - "Debe Seleccionar Rango Inferior de Fecha" (RN-08, tipo elegido sin fecha inicial)
 #
-# **DEFECTO REAL CRITICO, confirmado en 2 PANTALLAS DISTINTAS del mismo
-# proyecto (ver tambien `consulta_cortes_pendientes.py`): ingresar una
-# fecha calendario VALIDA en cualquier campo de fecha de este tipo
-# (`nz-date-picker` + input asociado) congela la pantalla por completo.**
-# Reproducido aca con `press_sequentially` normal Y con delay de 300ms por
-# caracter (descarta que sea un artefacto de automatizacion "demasiado
-# rapida" - el freeze ocurre incluso escribiendo lento, a mitad de la
-# cadena de caracteres). Sintoma identico al de RF-07: cualquier operacion
-# posterior sobre el popup (`screenshot()`, etc.) cuelga 30s+ sin
-# excepcion de JS, sin error de consola, sin dialogo nativo. Una fecha
-# INVALIDA o el campo vacio NO producen el freeze (validan rapido). Dado
-# que se reproduce IGUAL en 2 aplicativos Angular distintos (con
-# estructura de date-picker ligeramente distinta en el HTML), es probable
-# que sea un defecto compartido de una libreria/version de componente
-# comun a varias pantallas de este sprint - **cualquier caso que necesite
-# ingresar una fecha calendario real y valida en un filtro de este tipo
-# queda bloqueado hasta que se resuelva en el ambiente.**
+# **CORRECCION 02/11/2026 - el freeze del date-picker YA NO SE REPRODUCE
+# en esta pantalla tampoco** (mismo patron de recuperacion que
+# `consulta_cortes_pendientes.py`, ver su ficha tecnica). Confirmado en
+# vivo: escribir fecha + screenshot + input_value() terminan en <2s;
+# busqueda completa con solo el filtro de fecha (operador "=", fecha de
+# hoy) trae resultados reales en pocos segundos (ver
+# _exploracion/explore_91_rf09_revalidar_freeze.py). CP064/068/069/071
+# confirmados con los mensajes EXACTOS del EF.
+#
+# **Dato real confirmado 02/11/2026**: fecha "=" 02/11/2026 (sin otro
+# filtro) trae 1 solicitud real - suministro 2353914, N. Solicitud
+# 872378, Estado INGRESADO, Sucursal La República. Los datos reales de
+# Pruebas estan muy concentrados cerca de la fecha del dia - se probaron
+# 9 rangos "Entre" de 31 dias distintos a lo largo de +1 año (dic/2025 a
+# nov/2026) y la mayoria dio 0 registros.
+#
+# **CP070 (solicitudes Anuladas) destrabado generando el dato real**: no
+# se encontro ninguna Anulada preexistente, asi que se anulo una
+# solicitud pendiente real via RF-08 (cliente 1964154, N. Solicitud
+# 499575, Sucursal Cañete - ver
+# _exploracion/explore_98_rf08_anular_499575.py). Confirmado que esta
+# pantalla SI la muestra con Estado Solicitud = ANULADO (a diferencia de
+# RF-08, que la excluye tras la baja) - ver
+# _exploracion/explore_100_rf09_entre_mayo2025.py.
+#
+# **Gotcha de filtro de fecha confirmado en vivo**: filtrar SOLO por
+# fecha (sin N. de Cliente) no encontraba el registro recien anulado, ni
+# con operador "=" ni con "Entre" acotado a su Fecha Solicitud real
+# (19/05/2025) - hizo falta combinar N. de Cliente + el rango de fecha
+# para que el backend lo devolviera. No se investigo la causa exacta
+# (posible que el filtro de fecha solo indexe por otra fecha interna
+# distinta a "Fecha Solicitud").
 # ============================================================================
 #
 
@@ -1669,7 +1771,147 @@ def main():
         _CASO_OK = False
         try:
             login(page)
-            raise NotImplementedError("CP048 (RF-06 - Modificaci\u00f3n: Sucursal y \u00c1rea no se actualizan): Verificado en vivo con evidencia real esta sesion (28/09/2026, ver _exploracion/explore_53_rf06_modificar_2408.py y explore_59..61_rf06_*.py): la regla se cumple exactamente - al modificar Nombre/Proveedor/Sucursal del inspector real 1381 y grabar ('Grabaci\u00f3n exitosa.' confirmado), la grilla mostro Sucursal y \u00c1rea SIN CAMBIOS (Sin Sucursal / 3521) pese a haber elegido una Sucursal distinta en el combo, tal cual describe la regla. HALLAZGO REAL ADICIONAL: 'Detalles' sobre un inspector INACTIVO muestra los campos deshabilitados (solo lectura) - Modificar de verdad requiere un inspector ACTIVO real, ya que el unico registro 100% descartable (2408) quedo Inactivo tras CP044 y Alta (que generaria uno nuevo) esta bloqueado (ver CP046/047). NO se deja como caso automatizado repetible: probarlo con datos reales obliga a modificar temporalmente un inspector real (1381) y restaurarlo despues - un flujo de escritura+restauracion en 2 pasos que, si el 2do paso (restaurar) llega a fallar a mitad de camino (confirmado inestable: el cierre de los modales anidados de esta pantalla fallo de forma intermitente durante esta misma verificacion), deja datos REALES modificados sin revertir. Ya se restauro manualmente 1381 a sus valores originales (Nombre='Rodriguez Medina Abel', Proveedor='LUZ DEL SUR S.A.A.', confirmado en explore_61) tras esta verificacion.")
+            def _confirmar_grabar():
+                boton_confirmar = frame.locator("button.conf-btn-ok")
+                if not (boton_confirmar.count() and boton_confirmar.first.is_visible()):
+                    modal = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile("Confirmaci", re.I))
+                    boton_confirmar = modal.last.get_by_role("button", name=re.compile(r"^\s*(Aceptar|S[ií])\s*$", re.I))
+                assert boton_confirmar.count(), "No se encontro boton de confirmacion para Grabar"
+                boton_confirmar.first.click()
+                app.wait_for_timeout(2000)
+
+            app, frame = abrir_mantenedor_inspectores(page, paso_excel=1)
+            overlay = abrir_filtro_inspectores(app, frame)
+            overlay.locator("#flt-codigo").fill("1373")
+            app.wait_for_timeout(300)
+            overlay.locator("#flt-estado").select_option(value="S")
+            app.wait_for_timeout(300)
+            capturar_paso(app, "filtro_codigo_1373_activo", paso_excel=1)
+            overlay.get_by_role("button", name=re.compile(r"^\s*Filtrar\s*$")).click()
+            app.wait_for_timeout(3000)
+
+            filas = filas_inspectores(frame)
+            assert filas.count() > 0, "Se esperaba encontrar el inspector 1373 (Activo, confirmado en vivo)"
+            filas.first.click()
+            app.wait_for_timeout(500)
+            frame.get_by_role("button", name=re.compile(r"^\s*Detalles\s*$")).click()
+            app.wait_for_timeout(1500)
+            capturar_paso(app, "ventana_modificacion_abierta", paso_excel=2)
+
+            campo_nombre = frame.locator("#det-nombre")
+            select_proveedor = frame.locator("#det-proveedor")
+            checkbox_todas_sucursales = frame.locator("#det-todas-sucursales")
+
+            nombre_original = campo_nombre.input_value()
+            proveedor_original = select_proveedor.input_value()
+            todas_sucursales_original = checkbox_todas_sucursales.is_checked()
+            assert "Vega Rodriguez" in nombre_original, f"Nombre original inesperado (revisar si 1373 sigue siendo el mismo registro): {nombre_original!r}"
+
+            try:
+                nombre_temporal = nombre_original + " - MODIFICADO CP048"
+                campo_nombre.fill(nombre_temporal)
+                select_proveedor.select_option(label="20206018411 - TECSUR S.A.")
+                app.wait_for_timeout(300)
+                capturar_paso(app, "datos_modificados_temporalmente", paso_excel=3)
+
+                frame.get_by_role("button", name=re.compile(r"^\s*Grabar\s*$")).click()
+                app.wait_for_timeout(1500)
+                _confirmar_grabar()
+                texto_grabado = frame.locator("body").inner_text()
+                capturar_paso(app, "grabacion_exitosa", paso_excel=4)
+                assert "grabaci" in texto_grabado.lower() and "exitosa" in texto_grabado.lower(), (
+                    f"Se esperaba 'Grabaci\u00f3n exitosa.': {texto_grabado[-400:]!r}"
+                )
+
+                for _ in range(6):
+                    cerrado = False
+                    for nombre_boton in ("Aceptar", "Cerrar"):
+                        boton = frame.get_by_role("button", name=re.compile(rf"^\s*{nombre_boton}\s*$"))
+                        if boton.count() and boton.first.is_visible():
+                            boton.first.click(force=True)
+                            app.wait_for_timeout(800)
+                            cerrado = True
+                    if not cerrado:
+                        break
+
+                # DEFECTO REAL (confirmado en vivo 28/09/2026, re-verificado hoy):
+                # la grilla debe mostrar el Nombre/Proveedor actualizados, pero
+                # Sucursal y Area quedan SIN CAMBIOS pese a haber elegido otra
+                # Sucursal en el combo.
+                overlay2 = abrir_filtro_inspectores(app, frame)
+                overlay2.locator("#flt-codigo").fill("1373")
+                app.wait_for_timeout(300)
+                overlay2.locator("#flt-estado").select_option(value="S")
+                app.wait_for_timeout(300)
+                overlay2.get_by_role("button", name=re.compile(r"^\s*Filtrar\s*$")).click()
+                app.wait_for_timeout(3000)
+                capturar_paso(app, "defecto_real_sucursal_area_sin_cambios", paso_excel=5)
+
+                filas2 = filas_inspectores(frame)
+                assert filas2.count() > 0, "Se esperaba seguir encontrando el inspector 1373 tras modificar"
+                primera_fila_texto = filas2.first.inner_text()
+                assert "MODIFICADO CP048" in primera_fila_texto, (
+                    f"Se esperaba ver el Nombre modificado en la grilla: {primera_fila_texto!r}"
+                )
+                assert "0000 - Sin Sucursal" in primera_fila_texto and "3521" in primera_fila_texto, (
+                    f"DEFECTO REAL: se esperaba que Sucursal/Area quedaran SIN CAMBIOS "
+                    f"('0000 - Sin Sucursal' / '3521') pese a la modificacion: {primera_fila_texto!r}"
+                )
+            finally:
+                # RESTAURACION: corre siempre, pase lo que pase arriba.
+                overlay3 = abrir_filtro_inspectores(app, frame)
+                overlay3.locator("#flt-codigo").fill("1373")
+                app.wait_for_timeout(300)
+                overlay3.locator("#flt-estado").select_option(value="S")
+                app.wait_for_timeout(300)
+                overlay3.get_by_role("button", name=re.compile(r"^\s*Filtrar\s*$")).click()
+                app.wait_for_timeout(3000)
+                filas3 = filas_inspectores(frame)
+                assert filas3.count() > 0, "RESTAURACION: no se encontro el inspector 1373 para revertir los datos"
+                filas3.first.click()
+                app.wait_for_timeout(500)
+                frame.get_by_role("button", name=re.compile(r"^\s*Detalles\s*$")).click()
+                app.wait_for_timeout(1500)
+
+                frame.locator("#det-nombre").fill(nombre_original)
+                frame.locator("#det-proveedor").select_option(value=proveedor_original)
+                app.wait_for_timeout(300)
+                capturar_paso(app, "restaurando_valores_originales", paso_excel=6)
+
+                frame.get_by_role("button", name=re.compile(r"^\s*Grabar\s*$")).click()
+                app.wait_for_timeout(1500)
+                _confirmar_grabar()
+                texto_restaurado = frame.locator("body").inner_text()
+                capturar_paso(app, "restauracion_confirmada", paso_excel=7)
+                assert "grabaci" in texto_restaurado.lower() and "exitosa" in texto_restaurado.lower(), (
+                    f"RESTAURACION: se esperaba 'Grabaci\u00f3n exitosa.' al revertir, pero: {texto_restaurado[-400:]!r}"
+                )
+
+                for _ in range(6):
+                    cerrado2 = False
+                    for nombre_boton in ("Aceptar", "Cerrar"):
+                        boton = frame.get_by_role("button", name=re.compile(rf"^\s*{nombre_boton}\s*$"))
+                        if boton.count() and boton.first.is_visible():
+                            boton.first.click(force=True)
+                            app.wait_for_timeout(800)
+                            cerrado2 = True
+                    if not cerrado2:
+                        break
+
+                overlay4 = abrir_filtro_inspectores(app, frame)
+                overlay4.locator("#flt-codigo").fill("1373")
+                app.wait_for_timeout(300)
+                overlay4.locator("#flt-estado").select_option(value="S")
+                app.wait_for_timeout(300)
+                overlay4.get_by_role("button", name=re.compile(r"^\s*Filtrar\s*$")).click()
+                app.wait_for_timeout(3000)
+                capturar_paso(app, "estado_final_restaurado", paso_excel=8)
+                filas4 = filas_inspectores(frame)
+                if filas4.count() > 0:
+                    texto_final = filas4.first.inner_text()
+                    assert "MODIFICADO CP048" not in texto_final, (
+                        f"RESTAURACION INCOMPLETA: el nombre modificado sigue visible: {texto_final!r}"
+                    )
 
             capturar_paso(app, "estado_final_del_caso", paso_excel=max(_parsear_pasos_excel(PASOS_CASO), default=None))
             _CASO_OK = True

@@ -1,0 +1,18 @@
+{
+  "id": "CONO-0008",
+  "tipo": "COMPORTAMIENTO_OBSERVADO",
+  "descripcion": "La pantalla \"Atencion Integral\" (Comercial > Atencion Integral Al Cliente > Consulta De Clientes > Atencion Integral) tiene un typo real en su propio sidebar: el item dice literalmente \"Informacíon General\" (acento en la i) en vez de \"Información General\" (acento en la o, forma correcta). No bloquea nada, pero cualquier automatizacion/documentacion que busque el texto correcto no lo va a encontrar - hay que buscar el texto exacto tal cual esta escrito.",
+  "modulo": "atencion-integral-informacion-general",
+  "ambiente": null,
+  "version": null,
+  "fuente": "Exploracion en vivo 31/10/2026",
+  "requerimiento_origen": "MS024472",
+  "referencias_evidencia": [],
+  "estado": "VERIFICADO",
+  "fecha_creacion": "2026-10-31",
+  "fecha_ultima_verificacion": "2026-10-31",
+  "condiciones_revalidacion": "Revalidar si Desarrollo corrige el typo del label en una proxima version.",
+  "reemplaza": null,
+  "reemplazada_por": null,
+  "motivo_invalidacion": null
+}

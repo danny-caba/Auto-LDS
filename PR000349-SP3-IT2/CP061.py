@@ -546,8 +546,11 @@ def abrir_mantenedor_acciones_legacy(page, paso_excel=None):
     with page.expect_popup(timeout=15000) as popup_info:
         _click_visible(page, "Mantenedor De Acciones De Cortes")
     app = popup_info.value
-    app.wait_for_load_state("networkidle", timeout=20000)
-    app.wait_for_timeout(1500)
+    # Gotcha confirmado en vivo (pantalla legacy jQuery, igual que otras
+    # pantallas clasicas de este proyecto): "networkidle" nunca resuelve
+    # aca aunque la pagina cargue bien - usar "load" + espera fija.
+    app.wait_for_load_state("load", timeout=20000)
+    app.wait_for_timeout(2500)
     frame = app.locator("#aplicacion").content_frame if app.locator("#aplicacion").count() else app
     if paso_excel is not None:
         capturar_paso(app, "mantenedor_legacy_abierto", paso_excel=paso_excel)
@@ -851,7 +854,34 @@ def main():
         _CASO_OK = False
         try:
             login(page, paso_excel=1)
-            raise NotImplementedError('CP061 (RF-8 - Carga inicial con alcance multi-sucursal): falta escribir el body real - falta exploracion en vivo.')
+            app, frame = abrir_rf08(page, paso_excel=1)
+            app.wait_for_timeout(1500)
+            capturar_paso(app, "pantalla_inicial_con_selector", paso_excel=2)
+
+            selector_sucursal = frame.locator("nz-select, select").first
+            assert selector_sucursal.count() > 0, "Se esperaba un selector de sucursal visible (alcance multi-sucursal)"
+            assert selector_sucursal.is_visible() and selector_sucursal.is_enabled(), (
+                "El selector de sucursal deberia estar visible y habilitado"
+            )
+
+            texto_preseleccion = selector_sucursal.inner_text()
+            assert "3100" in texto_preseleccion or "Chacarilla" in texto_preseleccion, (
+                f"Se esperaba la sucursal de sesion preseleccionada (3100 - Chacarilla): {texto_preseleccion!r}"
+            )
+            capturar_paso(app, "sucursal_de_sesion_preseleccionada", paso_excel=3)
+
+            selector_sucursal.click()
+            app.wait_for_timeout(500)
+            opciones = frame.locator("nz-option-item, option")
+            assert opciones.count() >= 2, f"Se esperaban al menos 2 sucursales reales en el combo, hubo {opciones.count()}"
+            capturar_paso(app, "combo_de_sucursales_del_area_desplegado", paso_excel=3)
+            frame.locator("body").press("Escape")
+            app.wait_for_timeout(300)
+
+            tabla = frame.locator("table, nz-table").first
+            filas = filas_reales(tabla)
+            assert filas.count() >= 1, "Se esperaba al menos un proveedor activo cargado en la grilla de la sucursal preseleccionada"
+            capturar_paso(app, "grilla_de_proveedores_de_la_sucursal_preseleccionada", paso_excel=4)
 
             capturar_paso(app, "estado_final_del_caso", paso_excel=max(_parsear_pasos_excel(PASOS_CASO), default=None))
             _CASO_OK = True

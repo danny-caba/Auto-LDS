@@ -83,7 +83,7 @@
     "name": "Generar y descargar informe exitoso",
     "desc": "Validar el flujo completo de confirmación, generación y descarga del informe de la S.S. **Nota de alcance (descarte confirmado, no bug):** el `.frm` original (odess.frm:220-242), tras generar el archivo, hace un `chmod 777` y lo relee desde una unidad de red mapeada del PC cliente para enviarlo a la impresora local del usuario — mecanismo de arquitectura cliente-servidor de escritorio sin equivalente en un backend .NET Core en Kubernetes (sin mount compartido con el host Unix, sin impresora asociada al pod). Se descarta la expectativa literal de \"impresión\"; el resultado esperado en la plataforma web es la descarga del archivo. Ver ET 4.1.1 (Consideraciones Técnicas) para el detalle y para el riesgo técnico real distinto (lectura de archivo vía ruta local del pod en vez del canal EjecucionUnix), reportado a Desarrollo.",
     "precond": "Usuario con rol CONSCLIE con permiso de exportación/impresión sobre SRV.ODESS; se ejecutó Leer previamente y el botón Imprimir está habilitado.",
-    "datos": "Búsqueda previamente ejecutada con resultados o sin ellos (Imprimir se habilita en ambos casos).",
+    "datos": "Búsqueda previamente ejecutada con resultados o sin ellos (Imprimir se habilita en ambos casos). Dato real confirmado 02/11/2026: S.S. 1234567 (2 clientes) — la generación del informe puede tardar hasta ~240s, hay que esperar en bucle y no por un timeout corto.",
     "esperado": "Se solicita confirmación \"¿Desea generar archivos?\"; al confirmar, se informa \"Informe generado.\" y el archivo se descarga automáticamente en el equipo del usuario.",
     "pasos": "1. Ejecutar Leer exitosamente. 2. Presionar Imprimir. 3. Confirmar la generación de archivos. 4. Verificar el mensaje \"Informe generado.\" 5. Verificar que el archivo se descarga correctamente."
   },
@@ -790,5 +790,49 @@
     "datos": "Nueva Sucursal válida, distinta de la actual, sobre un cliente cuya orden fue creada por otro rol.",
     "esperado": "A pesar de no ser el creador de la orden, el usuario con permiso `ELIMINAR` (JEFESUCU) puede actualizarla: se actualiza la sucursal del cliente cargado y se informa \"Orden de Conexión actualizada.\" (no se informa \"Ud. no ingresó la Orden de Conexión. No puede actualizarla.\").",
     "pasos": "1. Ingresar el N.° de Cliente de una orden creada por otro rol. 2. Presionar Leer. 3. Verificar que Actualizar queda habilitado pese a no ser el creador. 4. Ingresar la nueva Sucursal. 5. Presionar Actualizar. 6. Verificar el mensaje \"Orden de Conexión actualizada.\""
+  },
+  "CP073": {
+    "rf": "RF-05",
+    "cu": "CU-02",
+    "cp": "CP073",
+    "name": "Origen no se borra al cambiar de Referencia (persistencia oculta)",
+    "desc": "**Caso agregado 02/11/2026 a partir del manual de usuario RF-05 (sección 3.3), no estaba en la matriz Excel original.** El manual documenta explícitamente: 'el campo Origen es el único filtro que no se borra al cambiar de referencia. Si vuelve a Otros Conceptos sin haberlo limpiado, el valor anterior reaparece y se vuelve a aplicar en la consulta aunque usted no lo haya elegido de nuevo.' Validar que este comportamiento es real y que efectivamente afecta la consulta siguiente de forma silenciosa (sin que el usuario lo haya vuelto a seleccionar).",
+    "precond": "Usuario con permiso de lectura sobre SRV.CONSPAG.",
+    "datos": "Referencia 'Otros Conceptos' con un valor de Origen elegido, luego cambiar a otra Referencia (p.ej. 'Actualización de Saldo') y volver a 'Otros Conceptos' sin tocar Origen.",
+    "esperado": "Al volver a 'Otros Conceptos', el combo Origen muestra el mismo valor elegido antes de cambiar de referencia (no vuelve a '(todos)'/'(no aplica)'), y ese valor se aplica en el siguiente Leer sin que el usuario lo haya vuelto a elegir.",
+    "pasos": "1. Elegir Referencia 'Otros Conceptos'. 2. Elegir un valor puntual en Origen. 3. Cambiar Referencia a 'Actualización de Saldo'. 4. Volver a elegir Referencia 'Otros Conceptos'. 5. Verificar que Origen conserva el valor elegido en el paso 2, sin haberlo vuelto a tocar."
+  },
+  "CP074": {
+    "rf": "RF-03",
+    "cu": "CU-02",
+    "cp": "CP074",
+    "name": "Límite de 15 días persiste incluso tras Limpiar",
+    "desc": "**Caso agregado 02/11/2026 a partir del manual de usuario RF-03 (sección 3.4), no estaba en la matriz Excel original.** El manual dice: 'una vez aplicado el límite de 15 días, este se mantiene vigente por el resto de la sesión, incluso si luego presiona Limpiar.' CP022 ya prueba que el límite sobrevive a un cambio de motivo/Tipo de Corte, pero no prueba el caso más fuerte y más sorprendente: que sobrevive a Limpiar, que en el resto de la pantalla sí resetea los filtros.",
+    "precond": "Usuario con rol ANDESE; se activó el límite de 15 días al elegir un motivo de Procesos (igual que CP022).",
+    "datos": "Elegir un motivo de Procesos (activa el límite), presionar Limpiar, y luego intentar un rango \"entre\" mayor a 15 días sin volver a elegir ningún motivo.",
+    "esperado": "A pesar de que Limpiar restablece los demás filtros, el límite de 15 días sigue vigente: se informa \"Puede consultar un lapso de 15 días como máximo.\" igual que en CP022.",
+    "pasos": "1. Seleccionar cualquier motivo de Procesos (activa el límite, igual que CP022). 2. Presionar Limpiar. 3. Verificar que los demás filtros se vaciaron. 4. Sin elegir ningún motivo, ingresar un rango \"entre\" mayor a 15 días. 5. Presionar Leer. 6. Verificar que el mensaje de límite de 15 días aparece igual, pese a no haber motivo seleccionado."
+  },
+  "CP075": {
+    "rf": "RF-05",
+    "cu": "CU-04",
+    "cp": "CP075",
+    "name": "Búsqueda exitosa — Encargos de Cobranza",
+    "desc": "**Caso agregado 02/11/2026 a partir de exploración en vivo (no estaba en la matriz Excel original).** Referencia 'Encargos de Cobranza' no tenía ningún caso dedicado (CP031-037 solo cubren Actualización de Saldo, Otros Conceptos y No Ubicados). Se confirmó en vivo que Fecha <= 01/01/2023 trae datos reales (26 filas). Validar la búsqueda exitosa y las columnas propias de esta referencia (Encargo, Cuotas Pag. — el manual documenta que 'Origen' pasa a llamarse 'Cuotas Pag.' con esta referencia).",
+    "precond": "Usuario con permiso de lectura sobre SRV.CONSPAG.",
+    "datos": "Referencia 'Encargos de Cobranza', operador de Fecha '<=', Desde 01/01/2023 (dato real confirmado con resultados: cliente 573750, oficina 0010, cajero 0005, lote 12319, concepto PLZ, encargo 0002).",
+    "esperado": "Se muestra el resultado paginado con las columnas propias de 'Encargos de Cobranza' (N.° Cliente, Sector, Suc.Cli., Estado, Encargo, Cuotas Pag. con dato real).",
+    "pasos": "1. Elegir Referencia 'Encargos de Cobranza'. 2. Elegir operador de Fecha '<='. 3. Ingresar Fecha Desde 01/01/2023. 4. Presionar Leer (confirmar el diálogo de 'sin filtro' si aparece). 5. Verificar que se carga un resultado real paginado con la columna Encargo poblada."
+  },
+  "CP076": {
+    "rf": "RF-05",
+    "cu": "CU-05",
+    "cp": "CP076",
+    "name": "Defecto real — Cobranza Externa falla siempre con Error en consulta",
+    "desc": "**Caso agregado 02/11/2026 a partir de exploración en vivo (no estaba en la matriz Excel original).** Mismo patrón que CP034 (No Ubicados): con Referencia 'Cobranza Externa', el backend responde 'Error de Servicio: Error en consulta.' sin importar el filtro de fecha usado (confirmado con Fecha <= 01/01/2023). No se pudo validar ningún comportamiento funcional de esta referencia porque la consulta nunca llega a ejecutarse con éxito — es la segunda de las 5 Referencias de RF-05 con este mismo defecto real (la otra es 'No Ubicados', CP034).",
+    "precond": "Usuario con permiso de lectura sobre SRV.CONSPAG.",
+    "datos": "Referencia 'Cobranza Externa', operador de Fecha '<=', Desde 01/01/2023.",
+    "esperado": "DEFECTO REAL: se muestra 'Error de Servicio' con el mensaje 'Error en consulta.' en vez del resultado de la búsqueda.",
+    "pasos": "1. Elegir Referencia 'Cobranza Externa'. 2. Elegir operador de Fecha '<='. 3. Ingresar Fecha Desde 01/01/2023. 4. Presionar Leer (confirmar el diálogo de 'sin filtro' si aparece). 5. Verificar que aparece el modal 'Error de Servicio' con 'Error en consulta.'"
   }
 }

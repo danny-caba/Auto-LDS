@@ -546,8 +546,11 @@ def abrir_mantenedor_acciones_legacy(page, paso_excel=None):
     with page.expect_popup(timeout=15000) as popup_info:
         _click_visible(page, "Mantenedor De Acciones De Cortes")
     app = popup_info.value
-    app.wait_for_load_state("networkidle", timeout=20000)
-    app.wait_for_timeout(1500)
+    # Gotcha confirmado en vivo (pantalla legacy jQuery, igual que otras
+    # pantallas clasicas de este proyecto): "networkidle" nunca resuelve
+    # aca aunque la pagina cargue bien - usar "load" + espera fija.
+    app.wait_for_load_state("load", timeout=20000)
+    app.wait_for_timeout(2500)
     frame = app.locator("#aplicacion").content_frame if app.locator("#aplicacion").count() else app
     if paso_excel is not None:
         capturar_paso(app, "mantenedor_legacy_abierto", paso_excel=paso_excel)
@@ -851,7 +854,30 @@ def main():
         _CASO_OK = False
         try:
             login(page, paso_excel=1)
-            raise NotImplementedError('CP063 (RF-8 - Cambio de sucursal recarga la grilla): falta escribir el body real - falta exploracion en vivo.')
+            app, frame = abrir_rf08(page, paso_excel=1)
+            app.wait_for_timeout(1500)
+
+            tabla = frame.locator("table, nz-table").first
+            filas_chacarilla = filas_reales(tabla)
+            cantidad_chacarilla = filas_chacarilla.count()
+            assert cantidad_chacarilla >= 1, "Se esperaba la grilla de la sucursal 3100-Chacarilla con proveedores reales"
+            capturar_paso(app, "proveedores_de_chacarilla_3100", paso_excel=2)
+
+            selector_sucursal = frame.locator("nz-select, select").first
+            selector_sucursal.click()
+            app.wait_for_timeout(500)
+            opcion_0022 = frame.locator("nz-option-item, option").filter(has_text="0022")
+            assert opcion_0022.count() > 0, "No se encontro la sucursal 0022 en el combo del area"
+            opcion_0022.first.click()
+            app.wait_for_timeout(2000)
+            capturar_paso(app, "sucursal_cambiada_a_0022", paso_excel=3)
+
+            tabla2 = frame.locator("table, nz-table").first
+            filas_0022 = filas_reales(tabla2)
+            assert filas_0022.count() != cantidad_chacarilla or filas_0022.count() == 0, (
+                f"La grilla deberia recargarse con datos distintos al cambiar de sucursal (Chacarilla={cantidad_chacarilla}, 0022={filas_0022.count()})"
+            )
+            capturar_paso(app, "grilla_recargada_para_la_sucursal_0022", paso_excel=3)
 
             capturar_paso(app, "estado_final_del_caso", paso_excel=max(_parsear_pasos_excel(PASOS_CASO), default=None))
             _CASO_OK = True

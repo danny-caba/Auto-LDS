@@ -53,17 +53,18 @@ lugar no lanza error, simplemente no le llega a nadie, dando la falsa
 impresion de que la app no reacciono a un cambio que en realidad nunca
 se escribio.
 
-**"Imprimir" (generacion de informe) confirmado en vivo que SIEMPRE
-falla con "No se generó informe."** (probado 3 veces, resultado
-consistente, no transitorio - a diferencia del caso de PR000349-SP1
-RF-09/RF-10 donde SI era transitorio). Esto coincide con un riesgo YA
-documentado explicitamente en el EF (Seccion 11, Supuestos): "la
-generación y descarga de informes de RF-01 ... depende de un servicio
-de generación de reportes externo al alcance de este sprint; su
-disponibilidad es un prerrequisito de cierre". El dialogo de
-confirmacion previo ("¿Desea generar archivos?", botones Cancelar/
-Aceptar) SI funciona normalmente - es solo la generacion real la que
-falla, consistente con el servicio externo no disponible en Pruebas.
+**CORRECCION 02/11/2026 - "Imprimir" (generacion de informe) NO esta
+permanentemente caido, es simplemente MUY LENTO.** El hallazgo original
+(27/09/2026, "SIEMPRE falla con 'No se generó informe.'", 3/3 veces) era
+un falso negativo de automatizacion: las 3 verificaciones esperaron solo
+unos pocos segundos tras confirmar "¿Desea generar archivos?". Con S.S.
+1234567 (2 clientes reales) y esperando hasta 240s, el informe SI se
+genera y se descarga ("ODESS_Informe_1234567.txt" real confirmado en
+vivo) - mismo patron de backend lento ya visto en RF-03 CP024 (hasta
+~220s). El dialogo de confirmacion previo ("¿Desea generar archivos?",
+botones Cancelar/Aceptar) funciona normalmente. Cualquier automatizacion
+futura de esta pantalla debe esperar en bucle (no un timeout corto fijo)
+tras confirmar Imprimir.
 ============================================================================
 """
 

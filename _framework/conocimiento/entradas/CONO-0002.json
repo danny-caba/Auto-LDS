@@ -1,0 +1,18 @@
+{
+  "id": "CONO-0002",
+  "tipo": "SOLUCION_TECNICA_COMPROBADA",
+  "descripcion": "[ENTRADA DE PRUEBA - solo para validar el mecanismo de invalidacion de la Etapa 5, no es conocimiento real del proyecto] Hallazgo ficticio de ejemplo.",
+  "modulo": "consulta-producto-local",
+  "ambiente": null,
+  "version": null,
+  "fuente": "validar_memoria_local.py (fixture de prueba)",
+  "requerimiento_origen": "MS024472",
+  "referencias_evidencia": [],
+  "estado": "INVALIDADO",
+  "fecha_creacion": "2026-10-31",
+  "fecha_ultima_verificacion": "2026-10-31",
+  "condiciones_revalidacion": null,
+  "reemplaza": null,
+  "reemplazada_por": null,
+  "motivo_invalidacion": "Motivo de ejemplo para esta validacion - era una entrada ficticia creada solo para probar el mecanismo de invalidacion, no describe nada real."
+}

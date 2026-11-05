@@ -1,0 +1,22 @@
+{
+  "CP039": {
+    "motivo": "2 DEFECTOS REALES ASOCIADOS. (1) HTTP 400: 'Leer' con filtro por defecto (Estado=Activos, sin otro filtro) da 'Demasiados registros para ser mostrados en la grilla.' porque el backend (POST .../inspector/web/api/inspector/Leer) responde HTTP 400 — el universo real de activos en Pruebas supera 2000 registros. Re-verificado 02/11/2026 incluso acotando por Proveedor = Luz del Sur (20331898008, el propio dueño del sistema): mismo HTTP 400. (2) CAUSA RAÍZ — filas duplicadas: con Proveedor=Luz del Sur + Estado=Noactivos (combo que SÍ queda bajo el límite, 116 registros declarados), de 100 filas del primer bloque solo hay 4 códigos de inspector reales distintos (922, 315, 314, 305), repetidos 13-29 veces cada uno — probable JOIN del backend sin deduplicar. El conteo de 'demasiados registros' del defecto (1) está inflado por esta misma duplicación.",
+    "fecha_verificacion": "2026-11-02",
+    "evidencia": "_exploracion/explore_69_rf06_cp039_revalidar.py, explore_70_rf06_cp039_proveedor_lds.py, explore_71_rf06_cp039_status_code.py, explore_75_rf06_cp041_duplicados.py"
+  },
+  "CP041": {
+    "motivo": "DEFECTO REAL: el botón 'Siguientes' ignora el filtro vigente. Con Proveedor=Luz del Sur (20331898008) + Sucursal=Chacarilla (3100) + Estado=Noactivos, el primer bloque es correcto (100 de 116, todas Estado=NoActivo/Sucursal=Chacarilla), pero al presionar Siguientes el pie salta a '200 de 116' (contradictorio con su propio total) y las filas nuevas son Estado=Activo + Sucursal='Sin Sucursal' — datos de otro filtro completamente distinto, mientras la etiqueta 'Filtro vigente' no cambia. No se pudo validar la regla original ('Siguientes agrega el siguiente bloque sin repetir la consulta') porque Siguientes no reusa el filtro original.",
+    "fecha_verificacion": "2026-11-02",
+    "evidencia": "_exploracion/explore_76_rf06_siguientes_rompe_filtro.py"
+  },
+  "CP047": {
+    "motivo": "DEFECTO REAL H005: el Alta de inspector con \"Todas las sucursales\" marcada graba correctamente (servicio de ficha funciona, confirmado en vivo) pero NO genera un registro por cada sucursal activa como describe el EF/MCP - genera UNA SOLA fila con Sucursal=\"0000 - Sin Sucursal\". Confirmado 2 veces (codigo 1525/ficha 5655 y codigo 1526/ficha 5763, mismo patron ambas). Comparado contra datos reales de catalogo (proveedor TECSUR, codigo 62879 y otros) donde SI existe una fila por sucursal real (mismo codigo repetido, sucursales 4200/4400) - confirma que el patron esperado existe de verdad en el sistema y que esta Alta no lo replica.",
+    "fecha_verificacion": "2026-11-04",
+    "evidencia": "_exploracion/explore_cp047_alta.py, explore_cp047_buscar_ficha.py, verificar_cp047_resultado.py"
+  },
+  "CP015": {
+    "motivo": "DEFECTO REAL H004: Anular con Criterio Masivo (rol JEFESUCU, permiso y boton correctos) falla con HTTP 400 del backend en POST /mantord/Anular - {\"statusCode\":400,\"mensaje\":\"Error al eliminar Orden de Conexion.\"}. Probado con 5 clientes reales distintos (1200079, 4024759, 1201729, 1200210, 1305674), incluido el cliente mas limpio conocido (1305674, sin bloqueo de ACTICOME ni guarda de proceso avanzado, funcional para Actualizar en CP009/012/014/072) - los 5 fallan igual en Anular. Defecto aislado al camino de Anular, independiente de H001 (esCreador, ya resuelto) y de la guarda de negocio de proceso avanzado.",
+    "fecha_verificacion": "2026-11-04",
+    "evidencia": "_exploracion/explore_cp015_anular.py, explore_cp015_http_status.py"
+  }
+}

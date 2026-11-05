@@ -1,0 +1,20 @@
+{
+  "id": "CONO-0009",
+  "tipo": "SOLUCION_TECNICA_COMPROBADA",
+  "descripcion": "La ruta de menu real para Informacion General NO es la que sugiere el texto corto del EF (\"Atencion Integral\" a secas) - son 4 niveles: Comercial > Atencion Integral Al Cliente > Consulta De Clientes > Atencion Integral (recien el ULTIMO abre el popup real). Los primeros 3 son categorias que solo expanden, no abren nada. Tras buscar un cliente, el click en \"Informacíon General\" cambia el contenido del MISMO iframe (#aplicacion) sin abrir otro popup, y dispara una carga async real (\"Cargando...\" visible brevemente) - hay que esperar activamente a que desaparezca antes de leer los campos.",
+  "modulo": "atencion-integral-informacion-general",
+  "ambiente": null,
+  "version": null,
+  "fuente": "Exploracion en vivo 31/10/2026 (_exploracion/explore_03 a explore_17)",
+  "requerimiento_origen": "MS024472",
+  "referencias_evidencia": [
+    "MS024472/generate_scripts.py (abrir_atencion_integral, entrar_informacion_general)"
+  ],
+  "estado": "VERIFICADO",
+  "fecha_creacion": "2026-10-31",
+  "fecha_ultima_verificacion": "2026-10-31",
+  "condiciones_revalidacion": null,
+  "reemplaza": null,
+  "reemplazada_por": null,
+  "motivo_invalidacion": null
+}

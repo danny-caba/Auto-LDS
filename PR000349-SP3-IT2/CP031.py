@@ -546,8 +546,11 @@ def abrir_mantenedor_acciones_legacy(page, paso_excel=None):
     with page.expect_popup(timeout=15000) as popup_info:
         _click_visible(page, "Mantenedor De Acciones De Cortes")
     app = popup_info.value
-    app.wait_for_load_state("networkidle", timeout=20000)
-    app.wait_for_timeout(1500)
+    # Gotcha confirmado en vivo (pantalla legacy jQuery, igual que otras
+    # pantallas clasicas de este proyecto): "networkidle" nunca resuelve
+    # aca aunque la pagina cargue bien - usar "load" + espera fija.
+    app.wait_for_load_state("load", timeout=20000)
+    app.wait_for_timeout(2500)
     frame = app.locator("#aplicacion").content_frame if app.locator("#aplicacion").count() else app
     if paso_excel is not None:
         capturar_paso(app, "mantenedor_legacy_abierto", paso_excel=paso_excel)

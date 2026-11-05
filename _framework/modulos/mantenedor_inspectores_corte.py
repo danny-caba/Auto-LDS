@@ -28,6 +28,42 @@ Limpiar/Cerrar DENTRO del overlay (hay 2 botones "Filtrar" en el DOM a la
 vez - el de la pantalla principal y el del modal - hay que ESCOPEAR el
 locator al overlay, si no Playwright tira "strict mode violation").
 
+**Gotcha de carga asincrona**: `#flt-proveedor` y `#flt-sucursal` nacen
+con `disabled=""` hasta que termina de cargar su catalogo (servicio
+async) - si se lee `option` antes de que se habiliten, solo aparece
+"-- Todos --"/"-- Todas --". Esperar a `is_enabled()` antes de leer o
+elegir una opcion (`#flt-estado` si tiene sus opciones fijas desde el
+inicio, no necesita esta espera).
+
+**DEFECTO REAL MAYOR 1/2 confirmado en vivo 02/11/2026 (filas duplicadas
+en la grilla de resultados)**: el backend de Leer/Filtrar devuelve el
+mismo inspector repetido muchas veces en vez de una fila por inspector -
+confirmado con Proveedor = Luz del Sur (20331898008) + Estado =
+Noactivos: el primer bloque de 100 filas tiene solo 4 codigos reales
+distintos (922, 315, 314, 305), repetidos 13-29 veces cada uno, fila
+por fila identica. Esto es consistente con un `JOIN` del backend que
+multiplica filas sin deduplicar, y explica tambien por que el filtro
+por defecto (Estado=Activos, ver CP039) siempre excede el limite de
+2000 registros admitidos por la grilla - el conteo real de inspectores
+distintos es probablemente mucho menor, pero el backend cuenta las
+filas duplicadas. Afecta la confiabilidad de CUALQUIER conteo o
+paginacion en esta pantalla - no es un problema puntual de un filtro.
+
+**DEFECTO REAL MAYOR 2/2 confirmado en vivo 02/11/2026 ("Siguientes"
+ignora el filtro vigente)**: agregando Sucursal = Chacarilla (3100) al
+filtro anterior (Proveedor=Luz del Sur + Estado=Noactivos), el PRIMER
+bloque de 100 filas SI viene correcto (todas Estado=NoActivo,
+Sucursal=Chacarilla, pie "100 de 116"). Al presionar **Siguientes**, el
+pie salta a "200 de 116" (incoherente con el propio total declarado) y
+las filas NUEVAS que agrega son Estado=Activo y Sucursal="0000 - Sin
+Sucursal" - datos de un filtro completamente distinto - mientras la
+etiqueta "Filtro vigente" sigue mostrando el filtro original sin avisar
+del cambio. Conclusion: Siguientes NO reusa el filtro de la consulta
+original, trae la pagina siguiente de una consulta distinta (posiblemente
+sin filtro, o del ultimo filtro "por defecto"). Ambos defectos (1 y 2)
+hacen que CUALQUIER resultado con mas de 1 pantalla de datos en esta
+grilla sea potencialmente no confiable.
+
 **RN-01 confirmado**: al abrir, filtro vigente = "Estado = Activos", SIN
 consulta automatica. Botones Siguientes/Limpiar/Detalles/Eliminar/Excel/
 Imprimir arrancan `disabled`. Leer/Filtrar/Agregar SI estan habilitados.
@@ -90,6 +126,26 @@ pendiente explorar mas o usar otro codigo/filtro.
 ESCRITURA real sobre Pruebas** (dan de baja, crean o modifican
 inspectores reales) - no se ejecutan sin coordinar antes con el usuario,
 a diferencia de las consultas de solo lectura de este modulo.
+
+**Baja individual y masiva (CP044/CP045) CONFIRMADAS FUNCIONALES en vivo
+02/11/2026** con codigos reales indicados explicitamente por el usuario
+en cada corrida (301 para individual; 303+304 para masiva) - ver
+secuencia completa (incluye el 2do overlay "Modo: Baja" y el boton de
+confirmacion real `button.conf-btn-ok`) en
+_exploracion/explore_55_56_rf06_eliminar_2408.py (primer hallazgo,
+28/09) y las corridas reales de CP044/CP045 en PR000349-SP2
+(generate_scripts.py). **Para marcar 2+ codigos especificos a la vez
+(mass delete) cuando el filtro Codigo exacto solo admite 1 valor**:
+usar un prefijo parcial (ej. "30") + Estado=Activos, y si los codigos
+buscados no aparecen en el primer bloque de 100, presionar Siguientes
+una vez (confirmado que el bloque acumulado de 200 SI trae codigos
+distintos del prefijo) - cuidado de marcar EXCLUSIVAMENTE las filas de
+los codigos buscados, el bloque trae varios codigos mezclados.
+Sigue sin existir forma de generar un inspector descartable NUEVO
+(Alta bloqueada, ver CP046/047) ni de revertir una baja - cada corrida
+real de CP044/CP045 consume codigos reales que no vuelven a estar
+disponibles, asi que para repetir estos casos en el futuro hace falta
+que el usuario indique codigos Activos nuevos cada vez.
 ============================================================================
 """
 

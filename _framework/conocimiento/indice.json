@@ -1,0 +1,40 @@
+{
+  "entradas": {
+    "CONO-0001": {
+      "tipo": "SOLUCION_TECNICA_COMPROBADA",
+      "modulo": "consulta-producto-local",
+      "estado": "VERIFICADO",
+      "resumen": "En la pantalla de consulta de producto (pagina de juguete _exploracion/pagina_local_ejemplo.html), page.fill('#codigo', ...",
+      "fuente": "Etapa 4 - validar_intervencion_local.py (casos CPL01/CPL02, ambos APROBADO)"
+    },
+    "CONO-0002": {
+      "tipo": "SOLUCION_TECNICA_COMPROBADA",
+      "modulo": "consulta-producto-local",
+      "estado": "INVALIDADO",
+      "resumen": "[ENTRADA DE PRUEBA - solo para validar el mecanismo de invalidacion de la Etapa 5, no es conocimiento real del proyecto]...",
+      "fuente": "validar_memoria_local.py (fixture de prueba)"
+    },
+    "CONO-0007": {
+      "tipo": "DATO_DE_PRUEBA",
+      "modulo": "atencion-integral-informacion-general",
+      "estado": "VERIFICADO",
+      "resumen": "Cliente de Pruebas reutilizable para la pantalla Informacion General: numero 15 = TOWER AND TOWER S.A. (RUC 20380618797)...",
+      "fuente": "Exploracion en vivo 31/10/2026 + corrida real CP001/CP002"
+    },
+    "CONO-0008": {
+      "tipo": "COMPORTAMIENTO_OBSERVADO",
+      "modulo": "atencion-integral-informacion-general",
+      "estado": "VERIFICADO",
+      "resumen": "La pantalla \"Atencion Integral\" (Comercial > Atencion Integral Al Cliente > Consulta De Clientes > Atencion Integral) ti...",
+      "fuente": "Exploracion en vivo 31/10/2026"
+    },
+    "CONO-0009": {
+      "tipo": "SOLUCION_TECNICA_COMPROBADA",
+      "modulo": "atencion-integral-informacion-general",
+      "estado": "VERIFICADO",
+      "resumen": "La ruta de menu real para Informacion General NO es la que sugiere el texto corto del EF (\"Atencion Integral\" a secas) -...",
+      "fuente": "Exploracion en vivo 31/10/2026 (_exploracion/explore_03 a explore_17)"
+    }
+  },
+  "actualizado_en": "2026-10-31T16:57:26.552206"
+}

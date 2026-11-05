@@ -1,0 +1,11 @@
+{
+  "requerimiento": "MS999001-EJEMPLO",
+  "fecha": "2026-10-31T16:57:26.439955",
+  "entradas_consultadas": [
+    "CONO-0001"
+  ],
+  "entradas_aplicadas": [
+    "CONO-0001"
+  ],
+  "entradas_descartadas": {}
+}

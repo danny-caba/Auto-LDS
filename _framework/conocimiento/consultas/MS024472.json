@@ -1,0 +1,15 @@
+{
+  "requerimiento": "MS024472",
+  "fecha": "2026-10-31T16:24:23.681924",
+  "entradas_consultadas": [
+    "CONO-0007",
+    "CONO-0008",
+    "CONO-0009"
+  ],
+  "entradas_aplicadas": [
+    "CONO-0007",
+    "CONO-0008",
+    "CONO-0009"
+  ],
+  "entradas_descartadas": {}
+}

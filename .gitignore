@@ -9,6 +9,9 @@
 # PR0000NN/ = proyectos por sprint (varios RF/casos). IP0000NN/ =
 # requerimientos individuales (IP = numero de ticket, agregado 27/10/2026
 # con IP016521) - mismo patron de carpeta, misma regla de .gitignore.
+# MS0000NN/ = proyectos tipo servicio/API (MS = agregado 04/11/2026 con
+# MS024634-SP3E, ej. pruebas via Postman/Insomnia contra un .svc) - mismo
+# patron de carpeta y misma regla que PR*/IP*.
 /*
 !/_framework/
 !/.gitignore
@@ -17,18 +20,23 @@
 !/Opciones_Menu_Principal.xlsx
 !/PR*/
 !/IP*/
+!/MS*/
 
-# Dentro de cada PR*/ o IP*/: permitir solo los programas y su matriz,
-# todo lo demas (evidencia CPxxx/, Documentos/documentos/, reportes/,
-# _exploracion/) queda ignorado por no listarse aca.
+# Dentro de cada PR*/, IP*/ o MS*/: permitir solo los programas y su
+# matriz, todo lo demas (evidencia CPxxx/, Documentos/documentos/,
+# reportes/, _exploracion/) queda ignorado por no listarse aca.
 PR*/*
 IP*/*
+MS*/*
 !PR*/*.py
 !PR*/matriz_casos.json
 !PR*/casos_fallidos_confirmados.json
 !IP*/*.py
 !IP*/matriz_casos.json
 !IP*/casos_fallidos_confirmados.json
+!MS*/*.py
+!MS*/matriz_casos.json
+!MS*/casos_fallidos_confirmados.json
 
 # Dentro de _framework y de cada PR*: cache/generados/config local, nunca
 # codigo fuente

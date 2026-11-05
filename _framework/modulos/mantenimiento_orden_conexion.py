@@ -65,6 +65,40 @@ serlo (CP012/013/014/015/016) salvo via el camino de usuario privilegiado
 (rol JEFESUCU, ver CP072) o consiguiendo el dato por otra via (BD,
 Desarrollo). Tampoco se encontro ningun cliente con orden YA ANULADA
 (CP011) en el escaneo inicial de ~25 clientes conocidos del proyecto.
+
+**Segundo escaneo 02/11/2026 (16 clientes nuevos, sacados en vivo de RF-03
+Consulta de Cortes y Reconexiones, rango 01/01/2023-15/01/2023, mismo
+resultado negativo)**: de los 16, 12 bloqueados por ACTICOME, 2 sin
+orden (245206, 483672), 2 con orden AJENA sin privilegio (1396651,
+1370862 - mismo patron que 1259207/1415959, "Sólo puede consultar"). CERO
+con orden propia o ya anulada. Van 41 clientes escaneados en total entre
+las dos sesiones sin encontrar un candidato natural.
+
+**DEFECTO REAL H001 CONFIRMADO 02/11/2026 - esCreador es estructuralmente
+inalcanzable con datos reales de Pruebas.** El usuario aporto una query
+directa real a `nucli`/`estoc` con 54 clientes en ambos estados de
+`traspaso` ('A'=anulada, 'S'=guarda activa) - ver
+_exploracion/explore_101_rf02_cp011_cp014.py: el 100% esta bloqueado por
+"El NUCLI fue generado por el ACTICOME, favor trabajar en dicho módulo",
+sin importar el estado de traspaso. Se probo ademas forzar
+`rol_creacion='DACD'` (rol real de sesion de DCABA_DW, confirmado por el
+usuario) via `UPDATE nucli SET rol_creacion='DACD' WHERE numero_cliente=
+1603071 AND numero_ss=880406 AND correlativo_ss=9;` sobre uno de esos
+clientes reales - el bloqueo de ACTICOME PERSISTE IGUAL (ver
+_exploracion/explore_102_rf02_validar_update_1603071.py), confirmando
+que es una compuerta COMPLETAMENTE INDEPENDIENTE de `rol_creacion`. No
+se identifico la columna real que la controla: se reviso el codigo
+fuente real de ACTICOME (`backend/gestioncliente.acticome`,
+`BoActicome.cs:4165 InsertarEstoc_BO`) pero esa investigacion solo
+alcanzo a descartar que sea la columna `traspaso` (ver nota historica de
+CP014 en matriz_casos.json), no identifico la columna real.
+**Conclusion**: con 54 clientes reales de muestra + 1 intento de UPDATE
+directo en BD, se considera H001 un defecto/bloqueo estructural de la
+BD/ambiente de Pruebas (no un problema de automatizacion ni de falta de
+intentos) - CP009 queda documentado como el defecto raiz, y CP011/
+CP012-016/CP072 quedan BLOQUEADOS por el mismo defecto (todos dependen
+de pasar esta misma compuerta antes de poder evaluar esCreador/
+esPrivilegiado).
 """
 
 import re

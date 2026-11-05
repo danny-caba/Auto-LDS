@@ -1,7 +1,10 @@
 """
 generate_scripts.py de PR000349-SP2 - FUENTE DE VERDAD que genera los CPxxx.py.
 
-Proyecto: 9 pantallas (RF-01..RF-09), 72 casos (ver matriz_casos.json).
+Proyecto: 9 pantallas (RF-01..RF-09), 76 casos (ver matriz_casos.json;
+CP073/CP074 agregados 02/11/2026 a partir de los manuales de usuario,
+CP075/CP076 agregados el mismo dia a partir de exploracion en vivo de
+RF-05 - ninguno de los 4 estaba en la matriz Excel original).
 Ver documentos/EF_texto.txt y documentos/ET_texto.txt para el detalle
 funcional/tecnico completo de cada RF.
 
@@ -355,21 +358,59 @@ assert filas_despues == 0, (
 capturar_paso(app, "correlativo_y_grilla_limpios", paso_excel=1)
 '''
 
-_MOTIVO_BLOQUEO_CP008 = (
-    "la generacion del informe (boton Imprimir) falla consistentemente con "
-    "'No se generó informe.' (confirmado en vivo 3 veces, no transitorio) - "
-    "coincide con un riesgo YA documentado en el EF (Seccion 11, Supuestos): "
-    "'la generación y descarga de informes de RF-01 ... depende de un "
-    "servicio de generación de reportes externo al alcance de este sprint; "
-    "su disponibilidad es un prerrequisito de cierre'. El dialogo de "
-    "confirmacion previo (¿Desea generar archivos?) SI funciona normalmente "
-    "- es solo la generacion real la que depende del servicio externo no "
-    "disponible en Pruebas. Ver _framework/modulos/consulta_clientes_ss.py "
-    "para el detalle completo."
-)
+# CORRECCION 02/11/2026: el hallazgo anterior ("falla consistentemente
+# con 'No se generó informe.'", confirmado 3/3 veces el 27/09) resulto
+# ser un FALSO NEGATIVO de automatizacion, no un defecto real ni un
+# servicio externo caido. Con S.S. 1234567 (2 clientes reales) y una
+# espera de hasta 240s tras confirmar "¿Desea generar archivos?" (en vez
+# de los ~1-5s que se esperaban antes), el informe SI se genera y se
+# descarga: archivo real "ODESS_Informe_1234567.txt" confirmado en vivo
+# via _exploracion/explore_68c_rf01_cp008_espera_larga.py. El servicio
+# es simplemente muy lento, mismo patron ya visto en CP024 (RF-03, hasta
+# ~220s) - no estaba permanentemente caido como se penso en septiembre.
 
-CUERPOS_REALES["CP008"] = f'''
-raise NotImplementedError("CP008 (RF-01 - Generar y descargar informe exitoso): {_MOTIVO_BLOQUEO_CP008}")
+CUERPOS_REALES["CP008"] = '''
+app, frame = abrir_consulta_clientes_ss(page, paso_excel=1)
+leer_clientes_ss(app, frame, numero_ss="1234567")
+capturar_paso(app, "busqueda_ss_1234567", paso_excel=2)
+
+_descarga = {"obj": None}
+app.on("download", lambda d: _descarga.__setitem__("obj", d))
+
+frame.get_by_role("button", name=re.compile("Imprimir")).click()
+app.wait_for_timeout(1000)
+dialogo = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile(r".", re.S))
+assert dialogo.count() and dialogo.first.is_visible(), "Se esperaba la confirmacion '\\u00bfDesea generar archivos?'"
+texto_confirmacion = dialogo.first.inner_text()
+assert "desea generar" in texto_confirmacion.lower(), f"Dialogo inesperado: {texto_confirmacion!r}"
+capturar_paso(app, "confirmacion_desea_generar_archivos", paso_excel=3)
+dialogo.first.get_by_role("button", name=re.compile(r"^\\s*Aceptar\\s*$", re.I)).first.click(force=True)
+
+# El backend puede tardar bastante (confirmado en vivo: hasta ~240s en
+# una corrida real) - esperar en bucle en vez de un timeout corto fijo.
+plazo = time.monotonic() + 240
+resultado = None
+while time.monotonic() < plazo:
+    if _descarga["obj"] is not None:
+        resultado = ("descarga", _descarga["obj"])
+        break
+    modal2 = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile(".", re.S))
+    if modal2.count() and modal2.first.is_visible():
+        texto_actual = modal2.first.inner_text()
+        if "desea generar" not in texto_actual.lower():
+            resultado = ("modal", texto_actual)
+            break
+    app.wait_for_timeout(3000)
+
+assert resultado is not None, "Tras 240s, no hubo descarga ni modal final (ni exito ni el error conocido)"
+if resultado[0] == "modal":
+    capturar_paso(app, "modal_final_inesperado", paso_excel=4)
+    raise AssertionError(f"Se esperaba una descarga exitosa, pero aparecio este modal: {resultado[1]!r}")
+
+destino = EVIDENCIA / f"{CASO}_informe.txt"
+resultado[1].save_as(str(destino))
+assert destino.exists() and destino.stat().st_size > 0, "El archivo descargado esta vacio o no se guardo"
+capturar_paso(app, "informe_generado_y_descargado", paso_excel=4)
 '''
 
 # RF-02 "Mantenimiento de Ordenes de Conexion" (CP009-CP016, CP072) -
@@ -382,27 +423,59 @@ raise NotImplementedError("CP008 (RF-01 - Generar y descargar informe exitoso): 
 # proyectos de este framework), sin orden de conexion - mensaje real
 # EXACTO: "No se encontró Orden de Conexión del Cliente."
 #
-# CP009/CP011/CP012-016/CP072 QUEDAN BLOQUEADOS (28/10/2026): escaneados
-# ~25 clientes ya conocidos del proyecto - ninguno tiene una orden
-# CREADA por la cuenta de prueba (CP009 lo exige) ni una orden YA
-# ANULADA (CP011). La propia matriz Excel ya trae una nota de
-# Desarrollo confirmando que esto es un problema de dato conocido, no
-# de automatizacion: "no se encontró dato real que la satisfaga;
-# nucli.rol_creacion nunca coincide". CP012-016 dependen de ser
-# creador o de un rol privilegiado (JEFESUCU, CP072) sobre una orden
-# real - mismo bloqueo de raiz. Pendiente: conseguir estos datos via
-# Desarrollo/BD o que el usuario indique un cliente real valido.
+# DEFECTO REAL H001 confirmado en vivo 02/11/2026 (ver
+# _exploracion/explore_101_rf02_cp011_cp014.py, explore_102_rf02_validar_update_1603071.py):
+# se probaron 54 clientes reales con BD real (datos aportados por el
+# usuario via query directa a nucli/estoc, ambos estados de traspaso
+# 'A'=anulada y 'S'=guarda activa) y el 100% esta bloqueado por "El
+# NUCLI fue generado por el ACTICOME, favor trabajar en dicho módulo" -
+# independientemente del estado de traspaso. Se probo ademas forzar
+# rol_creacion='DACD' (rol real de sesion de DCABA_DW) via UPDATE
+# directo en BD sobre uno de esos clientes (1603071/880406/9): el
+# bloqueo de ACTICOME PERSISTE IGUAL, confirmando que es una compuerta
+# independiente de rol_creacion - no se identifico la columna real que
+# la controla (se investigo el codigo fuente real de ACTICOME,
+# `backend/gestioncliente.acticome` BoActicome.cs:4165
+# InsertarEstoc_BO, pero solo descarta que sea `traspaso`). Con una
+# muestra de 54 clientes reales con datos reales + un intento de UPDATE
+# directo, se considera H001 un defecto/bloqueo estructural de datos en
+# el ambiente de Pruebas: no hay ningun cliente real conocido cuya
+# orden de conexion sea editable por esta pantalla legacy - CP011 y
+# CP012-016/CP072 dependen todos de llegar a pasar esta misma compuerta,
+# asi que quedan BLOQUEADOS por este mismo defecto (no son fallas de
+# automatizacion independientes).
 
-_MOTIVO_BLOQUEO_RF02_DATO = (
-    "falta un cliente real con una orden de conexion en el estado que este caso necesita "
-    "(creada por la propia cuenta de prueba, o ya anulada) - escaneados ~25 clientes "
-    "conocidos del proyecto el 28/10/2026, ninguno califica. La propia matriz ya documenta "
-    "que Desarrollo tampoco encontro un dato real para la precondicion de creador "
-    "(nucli.rol_creacion nunca coincide). Ver _framework/modulos/mantenimiento_orden_conexion.py."
+_MOTIVO_BLOQUEO_H001 = (
+    "BLOQUEADO por el defecto real H001 (ver CP009): el 100% de una muestra de 54 clientes "
+    "reales (BD real, ambos estados de traspaso) esta bloqueado por 'El NUCLI fue generado "
+    "por el ACTICOME, favor trabajar en dicho módulo' antes de llegar a evaluar esCreador/"
+    "esPrivilegiado - incluso forzando rol_creacion via UPDATE directo en BD. Sin identificar "
+    "la columna real que controla ese bloqueo, no hay forma de alcanzar el flujo que este caso "
+    "necesita validar. Ver _framework/modulos/mantenimiento_orden_conexion.py."
 )
 
-CUERPOS_REALES["CP009"] = f'''
-raise NotImplementedError("CP009 (RF-02 - Leer exitoso, usuario creador de la orden): {_MOTIVO_BLOQUEO_RF02_DATO}")
+CUERPOS_REALES["CP009"] = '''
+app, frame = abrir_mantord(page, paso_excel=1)
+capturar_paso(app, "pantalla_inicial", paso_excel=1)
+
+# Cliente real con orden de conexion vigente, confirmado en BD real
+# (traspaso='A', anulada 2022-07-19) - aportado por el usuario via
+# query directa a nucli/estoc.
+mensaje = leer_orden(app, frame, "1603071")
+capturar_paso(app, "defecto_h001_bloqueo_acticome", paso_excel=2)
+assert mensaje is not None and "acticome" in mensaje.lower(), (
+    f"DEFECTO REAL H001 confirmado en vivo: se esperaba el bloqueo 'generado por el ACTICOME' "
+    f"(confirmado con 54 clientes reales + intento de UPDATE de rol_creacion, ver ficha tecnica "
+    f"del modulo) - revisar si el defecto se corrigio: {mensaje!r}"
+)
+
+raise AssertionError(
+    "DEFECTO REAL H001 CONFIRMADO: el camino 'esCreador' de esta pantalla es estructuralmente "
+    "inalcanzable con datos reales de Pruebas - el 100% de una muestra de 54 clientes reales "
+    "(ambos estados de traspaso) esta bloqueado por 'El NUCLI fue generado por el ACTICOME', "
+    "incluso forzando rol_creacion via UPDATE directo en BD. Ver "
+    "_framework/modulos/mantenimiento_orden_conexion.py para el detalle completo."
+)
 '''
 
 CUERPOS_REALES["CP010"] = '''
@@ -417,7 +490,31 @@ assert mensaje is not None and "no se encontr" in mensaje.lower() and "orden de 
 '''
 
 CUERPOS_REALES["CP011"] = f'''
-raise NotImplementedError("CP011 (RF-02 - Leer, orden ya anulada): {_MOTIVO_BLOQUEO_RF02_DATO}")
+raise AssertionError("CP011 (RF-02 - Leer, orden ya anulada): {_MOTIVO_BLOQUEO_H001}")
+'''
+
+CUERPOS_REALES["CP012"] = f'''
+raise AssertionError("CP012 (RF-02 - Actualizar exitoso, Criterio Individual): {_MOTIVO_BLOQUEO_H001}")
+'''
+
+CUERPOS_REALES["CP013"] = f'''
+raise AssertionError("CP013 (RF-02 - Actualizar exitoso, Criterio Masivo): {_MOTIVO_BLOQUEO_H001}")
+'''
+
+CUERPOS_REALES["CP014"] = f'''
+raise AssertionError("CP014 (RF-02 - Actualizar, guarda de negocio activa): {_MOTIVO_BLOQUEO_H001}")
+'''
+
+CUERPOS_REALES["CP015"] = f'''
+raise AssertionError("CP015 (RF-02 - Anular exitoso, Criterio Masivo + rol autorizado): {_MOTIVO_BLOQUEO_H001}")
+'''
+
+CUERPOS_REALES["CP016"] = f'''
+raise AssertionError("CP016 (RF-02 - Anular, restriccion a Criterio Masivo): {_MOTIVO_BLOQUEO_H001}")
+'''
+
+CUERPOS_REALES["CP072"] = f'''
+raise AssertionError("CP072 (RF-02 - Actualizar exitoso, usuario privilegiado JEFESUCU): {_MOTIVO_BLOQUEO_H001}")
 '''
 
 # RF-04 "Consulta de Cuadratura de Sesion" (CP025-CP030) - bodies reales,
@@ -1160,51 +1257,184 @@ CUERPOS_REALES["CP042"] = '''
 app, frame = abrir_mantenedor_inspectores(page, paso_excel=1)
 overlay = abrir_filtro_inspectores(app, frame)
 capturar_paso(app, "ventana_filtro_abierta", paso_excel=1)
-aplicar_filtro_inspectores(app, overlay, codigo="1", ficha="4504")
+aplicar_filtro_inspectores(app, overlay, codigo="1", ficha="5631")
 capturar_paso(app, "codigo_y_ficha_completados", paso_excel=2)
 
-texto = frame.locator("body").inner_text()
-linea_filtro = next((l for l in texto.splitlines() if l.startswith("Filtro vigente")), "")
-assert "Ficha = 4504" in linea_filtro, f"Se esperaba ver 'Ficha = 4504' en el filtro vigente: {linea_filtro!r}"
+# El backend de esta pantalla puede tardar en actualizar "Filtro vigente"
+# tras Filtrar (mismo patron lento ya visto en otros CP de RF-06) -
+# esperar en bucle en vez de leer una sola vez a los 2s fijos del helper.
+plazo = time.monotonic() + 20
+linea_filtro = ""
+while time.monotonic() < plazo:
+    texto = frame.locator("body").inner_text()
+    linea_filtro = next((l for l in texto.splitlines() if l.startswith("Filtro vigente")), "")
+    if "Ficha = 5631" in linea_filtro:
+        break
+    app.wait_for_timeout(1000)
+assert "Ficha = 5631" in linea_filtro, f"Se esperaba ver 'Ficha = 5631' en el filtro vigente: {linea_filtro!r}"
 assert "C\\u00f3digo = 1" not in linea_filtro and "C\\u00f3digo" in linea_filtro, (
     f"Se esperaba el rotulo fijo 'C\\u00f3digo' SIN el valor tecleado (RN conocida): {linea_filtro!r}"
 )
 filas = filas_inspectores(frame)
-assert filas.count() > 0, "Se esperaba al menos 1 resultado para Ficha=4504"
+assert filas.count() > 0, "Se esperaba al menos 1 resultado para Ficha=5631"
 primera_fila = filas.first.inner_text()
-assert "4504" in primera_fila, f"El resultado deberia corresponder al filtro de Ficha: {primera_fila!r}"
+assert "5631" in primera_fila, f"El resultado deberia corresponder al filtro de Ficha: {primera_fila!r}"
 capturar_paso(app, "resultado_prioriza_ficha_sobre_codigo", paso_excel=4)
 '''
 
-_MOTIVO_BLOQUEO_CP039 = (
-    "HALLAZGO REAL (contradice el supuesto de la matriz): presionar Leer "
-    "con el filtro por defecto (Estado=Activos, sin ningun otro filtro) "
-    "da 'Demasiados registros para ser mostrados en la grilla.' (RN-03) "
-    "- el universo real de inspectores ACTIVOS en Pruebas supera el "
-    "limite de 2000 registros (confirmado en vivo 28/09/2026; lo mismo "
-    "pasa con Estado=Noactivos solo). La matriz asumia que el filtro por "
-    "defecto ya devolveria un resultado dentro del limite - en la "
-    "practica hace falta SIEMPRE combinarlo con un filtro adicional via "
-    "la ventana Filtrar (ver CP042) para quedar debajo del limite, pero "
-    "eso ya no es un \\'Leer con filtro por defecto\\' como pide el caso. "
-    "Ver ficha tecnica de _framework/modulos/mantenedor_inspectores_corte.py."
+# DEFECTO REAL confirmado 02/11/2026 (re-verificado en vivo, incluye
+# ahora el codigo HTTP real via _exploracion/explore_71_rf06_cp039_status_code.py):
+# presionar Leer con el filtro por defecto (Estado=Activos, sin ningun
+# otro filtro) da 'Demasiados registros para ser mostrados en la
+# grilla.' porque el backend (POST .../inspector/web/api/inspector/Leer)
+# responde HTTP 400 - el universo real de inspectores ACTIVOS en Pruebas
+# supera el limite de 2000 registros. Tambien se probo acotando por
+# Proveedor = Luz del Sur (20331898008) desde la ventana Filtrar: MISMO
+# resultado (400), ni siquiera el propio proveedor dueno del sistema
+# queda bajo el limite.
+#
+# CAUSA RAIZ (agregada como paso 2, 02/11/2026 - ver
+# _exploracion/explore_75_rf06_cp041_duplicados.py): el motivo por el
+# que el universo "supera 2000" es que el backend devuelve FILAS
+# DUPLICADAS en vez de una fila por inspector - confirmado con
+# Proveedor=Luz del Sur + Estado=Noactivos (combo que SI queda bajo el
+# limite, 116 "registros" declarados): de 100 filas del primer bloque,
+# solo hay 4 codigos de inspector reales distintos (922, 315, 314, 305),
+# repetidos 13-29 veces cada uno, fila por fila identica (probable JOIN
+# del backend sin deduplicar). El conteo de "demasiados registros" esta
+# inflado por esta misma duplicacion.
+
+CUERPOS_REALES["CP039"] = '''
+app, frame = abrir_mantenedor_inspectores(page, paso_excel=1)
+capturar_paso(app, "pantalla_inicial", paso_excel=1)
+
+respuestas_leer = []
+app.on("response", lambda r: respuestas_leer.append((r.status, r.url)) if "/inspector/Leer" in r.url else None)
+
+frame.get_by_role("button", name=re.compile(r"^\\s*Leer\\s*$")).click()
+app.wait_for_timeout(3000)
+
+modal = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile(".", re.S))
+assert modal.count() and modal.first.is_visible(), "Se esperaba la Ventana de Validacion de 'demasiados registros'"
+mensaje = modal.first.inner_text()
+capturar_paso(app, "defecto_real_demasiados_registros", paso_excel=2)
+assert "demasiados registros" in mensaje.lower(), f"Mensaje inesperado: {mensaje!r}"
+
+assert respuestas_leer, "No se capturo ninguna respuesta de red para /inspector/Leer"
+status_real = respuestas_leer[-1][0]
+assert status_real == 400, (
+    f"DEFECTO REAL: se esperaba HTTP 400 del backend (confirmado en vivo 02/11/2026), "
+    f"se obtuvo {status_real} - {respuestas_leer[-1][1]}"
+)
+modal.first.get_by_role("button", name=re.compile("Aceptar", re.I)).click()
+app.wait_for_timeout(500)
+
+# Paso 2: causa raiz - filas duplicadas (ver comentario arriba). Se usa
+# Proveedor=Luz del Sur + Estado=Noactivos porque es el combo real
+# conocido que SI queda bajo el limite de 2000 y permite ver filas.
+overlay = abrir_filtro_inspectores(app, frame)
+overlay.locator("#flt-proveedor").select_option(label="20331898008 - LUZ DEL SUR S.A.A.")
+app.wait_for_timeout(300)
+overlay.locator("#flt-estado").select_option(value="N")
+app.wait_for_timeout(300)
+capturar_paso(app, "filtro_proveedor_lds_noactivos", paso_excel=3)
+overlay.get_by_role("button", name=re.compile(r"^\\s*Filtrar\\s*$")).click()
+app.wait_for_timeout(3000)
+capturar_paso(app, "resultado_bajo_el_limite", paso_excel=4)
+
+filas = filas_inspectores(frame)
+n = filas.count()
+assert n > 0, "Se esperaba al menos 1 fila con Proveedor=Luz del Sur + Estado=Noactivos"
+codigos = [filas.nth(i).locator("td").nth(1).inner_text().strip() for i in range(n)]
+codigos_distintos = set(codigos)
+capturar_paso(app, "defecto_real_filas_duplicadas", paso_excel=5)
+assert len(codigos_distintos) < n, (
+    f"DEFECTO REAL (causa raiz de 'demasiados registros') confirmado en vivo 02/11/2026: "
+    f"se esperaban filas duplicadas (codigos distintos < total de filas), pero esta corrida dio "
+    f"{len(codigos_distintos)} codigos distintos sobre {n} filas - revisar si el defecto se corrigio"
 )
 
-CUERPOS_REALES["CP039"] = f'''
-raise NotImplementedError("CP039 (RF-06 - Leer listado con resultados dentro del l\\u00edmite): {_MOTIVO_BLOQUEO_CP039}")
+# Los 2 defectos de arriba (HTTP 400 por "demasiados registros" y su
+# causa raiz de filas duplicadas) ya quedaron confirmados y con
+# evidencia capturada en los pasos anteriores - se levanta esta
+# excepcion a proposito para que la corrida quede marcada FALLIDO
+# (rojo, defecto real confirmado) en el reporte consolidado, en vez de
+# OK (verde), ya que la pantalla NO funciona correctamente.
+raise AssertionError(
+    f"DEFECTOS REALES CONFIRMADOS: (1) Leer con filtro por defecto da HTTP 400 "
+    f"'Demasiados registros...' - {mensaje!r}. (2) Causa raiz: filas duplicadas, solo "
+    f"{len(codigos_distintos)} codigos distintos en {n} filas (Proveedor=Luz del Sur + Estado=Noactivos)."
+)
 '''
 
-_MOTIVO_BLOQUEO_CP041 = (
-    "No se encontro aun un filtro real que devuelva un resultado dentro "
-    "del rango >100 y <2000 registros (el limite exacto para probar "
-    "Siguientes) - el filtro por defecto ya excede 2000 (ver CP039) y los "
-    "filtros puntuales probados devuelven pocos registros. Pendiente de "
-    "mas exploracion o de que el usuario indique un filtro real conocido "
-    "en ese rango."
+# DEFECTO REAL MAYOR descubierto 02/11/2026 ("Siguientes" ignora el
+# filtro vigente - ver _exploracion/explore_76_rf06_siguientes_rompe_filtro.py):
+# con Proveedor = Luz del Sur (20331898008) + Sucursal = Chacarilla
+# (3100) + Estado = Noactivos, el primer bloque SI viene correcto (100
+# filas, todas Estado=NoActivo y Sucursal=Chacarilla, pie "100 de 116").
+# Al presionar Siguientes, el pie salta a "200 de 116" (contradictorio
+# con su propio total declarado) y las filas NUEVAS son Estado=Activo y
+# Sucursal="0000 - Sin Sucursal" - datos de OTRO filtro completamente
+# distinto, mientras la etiqueta "Filtro vigente" sigue mostrando el
+# filtro original sin avisar del cambio. Conclusion: Siguientes NO
+# reusa el filtro de la consulta original. (La causa-raiz de filas
+# duplicadas que tambien se encontro en esta misma exploracion quedo
+# documentada en CP039, que es donde corresponde tematicamente.)
+
+CUERPOS_REALES["CP041"] = '''
+app, frame = abrir_mantenedor_inspectores(page, paso_excel=1)
+overlay = abrir_filtro_inspectores(app, frame)
+overlay.locator("#flt-proveedor").select_option(label="20331898008 - LUZ DEL SUR S.A.A.")
+app.wait_for_timeout(300)
+overlay.locator("#flt-sucursal").select_option(label="3100 - Chacarilla")
+app.wait_for_timeout(300)
+overlay.locator("#flt-estado").select_option(value="N")
+app.wait_for_timeout(300)
+capturar_paso(app, "filtro_lds_chacarilla_noactivos", paso_excel=1)
+overlay.get_by_role("button", name=re.compile(r"^\\s*Filtrar\\s*$")).click()
+app.wait_for_timeout(3000)
+capturar_paso(app, "primer_bloque_correcto", paso_excel=2)
+
+filas = filas_inspectores(frame)
+n = filas.count()
+assert n > 0, "Se esperaba al menos 1 fila con Proveedor=Luz del Sur + Sucursal=Chacarilla + Estado=Noactivos"
+estados_antes = set(filas.nth(i).locator("td").nth(5).inner_text().strip() for i in range(n))
+assert estados_antes == {"N - NoActivo"}, f"Se esperaba que el primer bloque fuera todo NoActivo: {estados_antes!r}"
+texto_antes = frame.locator("body").inner_text()
+pie_antes = next((l for l in texto_antes.splitlines() if "Registros" in l), "")
+
+boton_siguientes = frame.get_by_role("button", name=re.compile(r"^\\s*Siguientes\\s*$"))
+assert boton_siguientes.is_enabled(), "El boton Siguientes deberia estar habilitado (hay mas de 100 registros declarados)"
+boton_siguientes.click()
+app.wait_for_timeout(3000)
+capturar_paso(app, "tras_presionar_siguientes", paso_excel=3)
+
+filas_despues = filas_inspectores(frame)
+n_despues = filas_despues.count()
+estados_nuevas_filas = set(filas_despues.nth(i).locator("td").nth(5).inner_text().strip() for i in range(n, n_despues))
+texto_despues = frame.locator("body").inner_text()
+pie_despues = next((l for l in texto_despues.splitlines() if "Registros" in l), "")
+
+# DEFECTO REAL: las filas que agrega Siguientes NO respetan el filtro
+# de Estado vigente (deberian seguir siendo "N - NoActivo") - confirmado
+# en vivo que trae "S - Activo" en su lugar (ver comentario arriba).
+capturar_paso(app, "defecto_real_siguientes_ignora_filtro", paso_excel=4)
+assert not estados_nuevas_filas.issubset({"N - NoActivo"}), (
+    f"DEFECTO REAL confirmado en vivo 02/11/2026: se esperaba que las filas nuevas de Siguientes "
+    f"tambien sean 'N - NoActivo' (mismo filtro), pero trajeron estos estados: {estados_nuevas_filas!r} "
+    f"(pie antes: {pie_antes!r}, pie despues: {pie_despues!r}) - revisar si el defecto se corrigio"
 )
 
-CUERPOS_REALES["CP041"] = f'''
-raise NotImplementedError("CP041 (RF-06 - Leer Siguientes/paginaci\\u00f3n): {_MOTIVO_BLOQUEO_CP041}")
+# El defecto de arriba (Siguientes ignora el filtro vigente) ya quedo
+# confirmado y con evidencia capturada en los pasos anteriores - se
+# levanta esta excepcion a proposito para que la corrida quede marcada
+# FALLIDO (rojo, defecto real confirmado) en el reporte consolidado, en
+# vez de OK (verde), ya que la pantalla NO funciona correctamente.
+raise AssertionError(
+    f"DEFECTO REAL CONFIRMADO: Siguientes ignora el filtro vigente (Estado=Noactivos + "
+    f"Sucursal=Chacarilla) y trae estados {estados_nuevas_filas!r} en su lugar "
+    f"(pie antes: {pie_antes!r}, pie despues: {pie_despues!r})."
+)
 '''
 
 CUERPOS_REALES["CP043"] = '''
@@ -1247,50 +1477,252 @@ assert marcadas_activa >= 1, "RN-07: el clic individual sobre una fila Activa SI
 capturar_paso(app, "click_individual_en_activa_marca", paso_excel=2)
 '''
 
-_MOTIVO_BLOQUEO_CP044_045 = (
-    "Verificado en vivo con evidencia real esta sesion (28/09/2026, ver "
-    "_exploracion/explore_55_56_rf06_eliminar_2408.py): marcar el "
-    "inspector de prueba 2408 y presionar Eliminar abrio el Detalle en "
-    "Modo: Baja y, al confirmar, informo exactamente 'Eliminaci\\u00f3n "
-    "realizada Satisfactoriamente.' - la regla funciona. NO se deja como "
-    "caso automatizado repetible: la Baja no tiene reversion en la UI "
-    "(no hay boton 'reactivar', el campo Estado es de solo lectura) y "
-    "Alta -que permitiria generar un inspector descartable nuevo en cada "
-    "corrida- esta BLOQUEADO por el servicio externo de validacion de "
-    "ficha (ver CP046/CP047). Sin una fuente renovable de datos "
-    "descartables, repetir este caso eliminaria inspectores REALES."
+# RE-INTENTADO 02/11/2026 (ver _exploracion/explore_77_rf06_cp044_estado_2408.py
+# y explore_78_rf06_cp044_intento.py): confirmado en vivo que el unico
+# inspector descartable conocido (codigo 2408) sigue N-NoActivo (quedo
+# asi desde la Baja real del 28/09/2026, sin reversion posible en la
+# UI). Con Estado=Noactivos, la fila SI aparece (19 filas duplicadas del
+# mismo registro - mismo defecto de CP039/CP041), pero su checkbox
+# individual esta deshabilitado (RN: solo se pueden marcar filas
+# S-Activo) y el boton Eliminar permanece deshabilitado - confirmado
+# que NO se puede repetir la Baja sobre este registro. Alta (que
+# generaria un descartable nuevo) sigue bloqueada por el servicio
+# externo de validacion de ficha (ver CP046/CP047) - sin eso, no hay
+# forma de obtener un inspector descartable para repetir este caso sin
+# arriesgar datos reales.
+
+# CP044 EJECUTADO DE VERDAD 02/11/2026. Primer intento con codigo 302
+# ("Antonio Lopez") funciono (confirmado "Operacion Exitosa" con
+# captura real), pero la corrida completa se cayo despues en el paso de
+# verificacion por un overlay que quedo sin cerrar - ya consumido, no
+# repetible. El usuario indico el codigo 301 ("Julio Rios", confirmado
+# S-Activo en vivo via _exploracion/explore_80_rf06_verificar_301_303_304.py)
+# para una corrida limpia de punta a punta con video. Secuencia
+# confirmada funcional el 28/09/2026 con 2408 (ver
+# _exploracion/explore_55_56_rf06_eliminar_2408.py): marcar -> Eliminar
+# (pantalla principal) -> se abre un 2do overlay "Modo: Baja" -> Eliminar
+# DENTRO de ese overlay -> confirmacion con boton real de clase
+# "conf-btn-ok" (NO es el patron Aceptar/role generico de otros modales
+# de esta pantalla) -> mensaje final.
+
+CUERPOS_REALES["CP044"] = '''
+app, frame = abrir_mantenedor_inspectores(page, paso_excel=1)
+overlay = abrir_filtro_inspectores(app, frame)
+overlay.locator("#flt-codigo").fill("301")
+app.wait_for_timeout(300)
+overlay.locator("#flt-estado").select_option(value="S")
+app.wait_for_timeout(300)
+capturar_paso(app, "filtro_codigo_301_activo", paso_excel=1)
+overlay.get_by_role("button", name=re.compile(r"^\\s*Filtrar\\s*$")).click()
+app.wait_for_timeout(3000)
+
+filas = filas_inspectores(frame)
+n = filas.count()
+assert n > 0, "Se esperaba encontrar el inspector 301 (Activo, confirmado en vivo)"
+fila = filas.first
+checkbox = fila.locator("input[type=checkbox]")
+assert checkbox.is_enabled(), "Se esperaba el checkbox HABILITADO (codigo 301 es S-Activo)"
+checkbox.check()
+app.wait_for_timeout(500)
+capturar_paso(app, "codigo_301_marcado", paso_excel=2)
+
+frame.get_by_role("button", name=re.compile(r"^\\s*Eliminar\\s*$")).click()
+app.wait_for_timeout(1500)
+capturar_paso(app, "ventana_detalle_modo_baja", paso_excel=3)
+
+overlay_baja = frame.locator("[id^='cdk-overlay-']").last
+boton_eliminar_modal = overlay_baja.get_by_role("button", name=re.compile(r"^\\s*Eliminar\\s*$"))
+assert boton_eliminar_modal.count(), "Se esperaba el boton Eliminar dentro de la ventana de Detalle (Modo: Baja)"
+boton_eliminar_modal.click()
+app.wait_for_timeout(1500)
+capturar_paso(app, "pidiendo_confirmacion", paso_excel=4)
+
+boton_confirmar = frame.locator("button.conf-btn-ok")
+assert boton_confirmar.count() and boton_confirmar.first.is_visible(), (
+    "Se esperaba el dialogo de confirmacion (\\'\\u00bfEsta seguro que desea eliminar el Registro?\\')"
+)
+boton_confirmar.first.click()
+app.wait_for_timeout(2000)
+capturar_paso(app, "baja_confirmada", paso_excel=5)
+
+texto_final = frame.locator("body").inner_text()
+assert "eliminaci" in texto_final.lower() and "satisfactoriamente" in texto_final.lower(), (
+    f"Se esperaba 'Eliminaci\\u00f3n realizada Satisfactoriamente.': {texto_final[-400:]!r}"
 )
 
-CUERPOS_REALES["CP044"] = f'''
-raise NotImplementedError("CP044 (RF-06 - Eliminar con una sola fila marcada): {_MOTIVO_BLOQUEO_CP044_045}")
+# Cerrar TODOS los overlays que queden abiertos (el modal "Operacion
+# Exitosa" y, debajo, la ventana de Detalle en Modo: Baja) - repetir
+# hasta que no quede ninguno visible, no alcanza con 1 pasada.
+for _ in range(6):
+    cerrado = False
+    for nombre_boton in ("Aceptar", "Cerrar"):
+        boton = frame.get_by_role("button", name=re.compile(rf"^\\s*{nombre_boton}\\s*$"))
+        if boton.count() and boton.first.is_visible():
+            boton.first.click(force=True)
+            app.wait_for_timeout(800)
+            cerrado = True
+    if not cerrado:
+        break
+capturar_paso(app, "modales_cerrados", paso_excel=6)
+
+# Verificar el estado final real: 301 debe quedar N-NoActivo
+overlay2 = abrir_filtro_inspectores(app, frame)
+overlay2.locator("#flt-codigo").fill("301")
+app.wait_for_timeout(300)
+overlay2.locator("#flt-estado").select_option(value="N")
+app.wait_for_timeout(300)
+overlay2.get_by_role("button", name=re.compile(r"^\\s*Filtrar\\s*$")).click()
+app.wait_for_timeout(3000)
+capturar_paso(app, "estado_final_verificado_noactivo", paso_excel=7)
+filas_finales = filas_inspectores(frame)
+assert filas_finales.count() > 0, "Se esperaba encontrar el codigo 301 como N-NoActivo tras la baja real"
 '''
 
-CUERPOS_REALES["CP045"] = f'''
-raise NotImplementedError("CP045 (RF-06 - Eliminaci\\u00f3n masiva de varias filas marcadas): {_MOTIVO_BLOQUEO_CP044_045} Ademas, tras usar el unico registro descartable conocido (2408) para CP044, no queda un 2do registro descartable disponible para una eliminacion masiva.")
-'''
+# CP045 DESTRABADO 02/11/2026: el usuario indico los codigos 303
+# ("Miguel Miranda") y 304 ("Cesar Chavez"), ambos confirmados S-Activo
+# en vivo. El filtro Codigo solo acepta un valor exacto (no admite
+# "303,304" ni "303-304", confirmado via _exploracion/explore_81_rf06_codigo_multivalor.py),
+# asi que para tenerlos juntos en la misma grilla se usa Codigo="30"
+# (prefijo parcial, Estado=Activos) + 1 click en Siguientes - confirmado
+# en vivo (_exploracion/explore_84_rf06_30_paginas.py) que el bloque de
+# 200 filas acumuladas SI incluye ambos codigos juntos. Cuidado: ese
+# mismo bloque tambien incluye 300, 301, 306-309 - hay que marcar
+# EXCLUSIVAMENTE las filas de 303 y 304 (301 esta reservado para CP044).
 
-_MOTIVO_BLOQUEO_CP046_047 = (
-    "DEFECTO/BLOQUEO REAL confirmado en vivo 28/09/2026 (ver "
-    "_exploracion/explore_51_rf06_alta_todas_sucursales.py y "
-    "explore_58_rf06_cp046_solo.py): CUALQUIER intento de Grabar un Alta "
-    "-sea con una Ficha inventada (999001) O CON UNA FICHA REAL YA "
-    "ASIGNADA (4504, la del inspector 1381)- falla igual con 'Error de "
-    "Servicio: Error al validar la ficha.' ANTES de llegar a evaluar la "
-    "regla de negocio especifica de este caso. Coincide exactamente con "
-    "el riesgo YA documentado en el EF (Seccion 11): 'el alta de un nuevo "
-    "inspector depende de un mecanismo de generacion de codigo "
-    "correlativo y de resolucion del area asociada a la sucursal, "
-    "provistos por un servicio de catalogos compartido; su disponibilidad "
-    "... es un prerrequisito de cierre'. No hay nada que hacer desde la "
-    "automatizacion hasta que ese servicio este disponible en Pruebas."
+CUERPOS_REALES["CP045"] = '''
+app, frame = abrir_mantenedor_inspectores(page, paso_excel=1)
+overlay = abrir_filtro_inspectores(app, frame)
+overlay.locator("#flt-codigo").fill("30")
+app.wait_for_timeout(300)
+overlay.locator("#flt-estado").select_option(value="S")
+app.wait_for_timeout(300)
+capturar_paso(app, "filtro_codigo_30_activos", paso_excel=1)
+overlay.get_by_role("button", name=re.compile(r"^\\s*Filtrar\\s*$")).click()
+app.wait_for_timeout(3000)
+
+filas = filas_inspectores(frame)
+codigos_pagina1 = set(filas.nth(i).locator("td").nth(1).inner_text().strip() for i in range(filas.count()))
+if not ({"303", "304"} <= codigos_pagina1):
+    boton_siguientes = frame.get_by_role("button", name=re.compile(r"^\\s*Siguientes\\s*$"))
+    assert boton_siguientes.is_enabled(), "Se esperaba poder traer mas registros con Siguientes para alcanzar 303 y 304"
+    boton_siguientes.click()
+    app.wait_for_timeout(3000)
+capturar_paso(app, "bloque_con_303_y_304", paso_excel=2)
+
+filas = filas_inspectores(frame)
+n = filas.count()
+fila_303 = None
+fila_304 = None
+for i in range(n):
+    codigo_fila = filas.nth(i).locator("td").nth(1).inner_text().strip()
+    if codigo_fila == "303" and fila_303 is None:
+        fila_303 = filas.nth(i)
+    elif codigo_fila == "304" and fila_304 is None:
+        fila_304 = filas.nth(i)
+    if fila_303 is not None and fila_304 is not None:
+        break
+assert fila_303 is not None and fila_304 is not None, (
+    f"No se encontraron filas de 303 y 304 juntas en el bloque cargado ({n} filas)"
 )
 
-CUERPOS_REALES["CP046"] = f'''
-raise NotImplementedError("CP046 (RF-06 - Alta de inspector con Ficha ya asignada): {_MOTIVO_BLOQUEO_CP046_047}")
+fila_303.locator("input[type=checkbox]").check()
+app.wait_for_timeout(300)
+fila_304.locator("input[type=checkbox]").check()
+app.wait_for_timeout(500)
+capturar_paso(app, "303_y_304_marcados", paso_excel=3)
+
+marcadas = frame.locator("table.resultados tbody tr input[type=checkbox]:checked").count()
+assert marcadas == 2, f"Se esperaban exactamente 2 filas marcadas (303 y 304), hay {marcadas}"
+
+frame.get_by_role("button", name=re.compile(r"^\\s*Eliminar\\s*$")).click()
+app.wait_for_timeout(1500)
+capturar_paso(app, "pidiendo_confirmacion_masiva", paso_excel=4)
+
+boton_confirmar = frame.locator("button.conf-btn-ok")
+if not (boton_confirmar.count() and boton_confirmar.first.is_visible()):
+    modal = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile(".", re.S))
+    assert modal.count() and modal.first.is_visible(), "Se esperaba un dialogo de confirmacion de eliminacion masiva"
+    boton_confirmar = modal.first.get_by_role("button", name=re.compile(r"^\\s*(Aceptar|S[ií])\\s*$", re.I))
+assert boton_confirmar.count(), "No se encontro boton de confirmacion para la eliminacion masiva"
+boton_confirmar.first.click()
+app.wait_for_timeout(2000)
+capturar_paso(app, "baja_masiva_confirmada", paso_excel=5)
+
+texto_final = frame.locator("body").inner_text()
+assert "eliminaron" in texto_final.lower() and "2" in texto_final and "satisfactoriamente" in texto_final.lower(), (
+    f"Se esperaba 'Se eliminaron 2 registros, satisfactoriamente.': {texto_final[-400:]!r}"
+)
+
+for _ in range(6):
+    cerrado = False
+    for nombre_boton in ("Aceptar", "Cerrar"):
+        boton = frame.get_by_role("button", name=re.compile(rf"^\\s*{nombre_boton}\\s*$"))
+        if boton.count() and boton.first.is_visible():
+            boton.first.click(force=True)
+            app.wait_for_timeout(800)
+            cerrado = True
+    if not cerrado:
+        break
+capturar_paso(app, "modales_cerrados", paso_excel=6)
+
+# Verificar estado final real: 303 y 304 deben quedar N-NoActivo
+for codigo_verificar in ("303", "304"):
+    overlay2 = abrir_filtro_inspectores(app, frame)
+    overlay2.locator("#flt-codigo").fill(codigo_verificar)
+    app.wait_for_timeout(300)
+    overlay2.locator("#flt-estado").select_option(value="N")
+    app.wait_for_timeout(300)
+    overlay2.get_by_role("button", name=re.compile(r"^\\s*Filtrar\\s*$")).click()
+    app.wait_for_timeout(3000)
+    capturar_paso(app, f"estado_final_{codigo_verificar}_noactivo", paso_excel=7)
+    filas_verif = filas_inspectores(frame)
+    assert filas_verif.count() > 0, f"Se esperaba encontrar el codigo {codigo_verificar} como N-NoActivo tras la baja masiva"
 '''
 
+# CP046 DESTRABADO 02/11/2026 (ver _exploracion/explore_85_rf06_cp046_ficha.py):
+# el servicio externo de validacion de ficha, caido el 28/09/2026 ('Error
+# de Servicio: Error al validar la ficha.'), ya responde normalmente -
+# mismo patron de recuperacion ya visto en CP008 (servicio de informes
+# de RF-01) y CP039 (backend de RF-02/03/05, un mes despues). Confirmado
+# en vivo: Ficha=4504 -> "Ficha 4504 no válida." (ya no es real); Ficha
+# real conocida 5631 (del inspector 1373) -> mensaje EXACTO del EF: "La
+# ficha 5631 ya tiene asignado el código de contratista 1373. No se
+# puede ingresar otro codigo a la misma ficha."
+
+CUERPOS_REALES["CP046"] = '''
+app, frame = abrir_mantenedor_inspectores(page, paso_excel=1)
+frame.get_by_role("button", name=re.compile(r"^\\s*Agregar\\s*$")).click()
+app.wait_for_timeout(1500)
+capturar_paso(app, "ventana_alta_abierta", paso_excel=1)
+
+campo_ficha = frame.locator("#det-ficha")
+campo_ficha.fill("5631")
+campo_ficha.press("Tab")
+app.wait_for_timeout(3000)
+capturar_paso(app, "ficha_5631_tab", paso_excel=2)
+
+modal = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile("Ventana de Validaci", re.I))
+assert modal.count() and modal.last.is_visible(), "Se esperaba la Ventana de Validacion sobre la ficha ya asignada"
+mensaje = modal.last.inner_text()
+capturar_paso(app, "mensaje_ficha_ya_asignada", paso_excel=3)
+assert "5631" in mensaje and "1373" in mensaje and "ya tiene asignado" in mensaje.lower(), (
+    f"Mensaje inesperado para ficha ya asignada: {mensaje!r}"
+)
+'''
+
+# CP047 sigue BLOQUEADO (no por el servicio, que ya funciona, sino por
+# falta de una ficha real VALIDA y aun no usada como inspector - crear
+# un Alta completa es una escritura permanente sin reversion en la UI,
+# igual que la Baja). Pendiente: el usuario indique una ficha real de
+# MANTRABEX que no sea ya un inspector.
 CUERPOS_REALES["CP047"] = f'''
-raise NotImplementedError("CP047 (RF-06 - Alta exitosa con Todas las sucursales marcada): {_MOTIVO_BLOQUEO_CP046_047}")
+raise NotImplementedError(
+    "CP047 (RF-06 - Alta exitosa con Todas las sucursales marcada): el servicio de "
+    "validacion de ficha ya funciona (confirmado en vivo 02/11/2026, ver CP046), pero "
+    "falta una ficha real VALIDA que no sea ya un inspector existente - probar con una "
+    "ficha inventada o ya usada solo confirma la validacion, no el Alta exitosa. "
+    "Pendiente: el usuario indique una ficha real disponible."
+)
 '''
 
 _MOTIVO_CP048_NO_AUTOMATIZADO = (
@@ -1318,8 +1750,156 @@ _MOTIVO_CP048_NO_AUTOMATIZADO = (
     "confirmado en explore_61) tras esta verificacion."
 )
 
-CUERPOS_REALES["CP048"] = f'''
-raise NotImplementedError("CP048 (RF-06 - Modificaci\\u00f3n: Sucursal y \\u00c1rea no se actualizan): {_MOTIVO_CP048_NO_AUTOMATIZADO}")
+# CP048 EJECUTADO DE VERDAD 02/11/2026 con codigo 1373 ("Vega Rodriguez
+# Alex Henry", ficha 5631, confirmado S-Activo) - autorizado
+# explicitamente por el usuario. Estructura con try/finally: el bloque
+# de RESTAURACION corre SIEMPRE, incluso si alguna de las verificaciones
+# de la regla de negocio falla a mitad de camino - exactamente el riesgo
+# que en septiembre impidio dejar este caso como automatizado (ver
+# _MOTIVO_CP048_NO_AUTOMATIZADO arriba, ya historico).
+
+CUERPOS_REALES["CP048"] = '''
+def _confirmar_grabar():
+    boton_confirmar = frame.locator("button.conf-btn-ok")
+    if not (boton_confirmar.count() and boton_confirmar.first.is_visible()):
+        modal = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile("Confirmaci", re.I))
+        boton_confirmar = modal.last.get_by_role("button", name=re.compile(r"^\\s*(Aceptar|S[ií])\\s*$", re.I))
+    assert boton_confirmar.count(), "No se encontro boton de confirmacion para Grabar"
+    boton_confirmar.first.click()
+    app.wait_for_timeout(2000)
+
+app, frame = abrir_mantenedor_inspectores(page, paso_excel=1)
+overlay = abrir_filtro_inspectores(app, frame)
+overlay.locator("#flt-codigo").fill("1373")
+app.wait_for_timeout(300)
+overlay.locator("#flt-estado").select_option(value="S")
+app.wait_for_timeout(300)
+capturar_paso(app, "filtro_codigo_1373_activo", paso_excel=1)
+overlay.get_by_role("button", name=re.compile(r"^\\s*Filtrar\\s*$")).click()
+app.wait_for_timeout(3000)
+
+filas = filas_inspectores(frame)
+assert filas.count() > 0, "Se esperaba encontrar el inspector 1373 (Activo, confirmado en vivo)"
+filas.first.click()
+app.wait_for_timeout(500)
+frame.get_by_role("button", name=re.compile(r"^\\s*Detalles\\s*$")).click()
+app.wait_for_timeout(1500)
+capturar_paso(app, "ventana_modificacion_abierta", paso_excel=2)
+
+campo_nombre = frame.locator("#det-nombre")
+select_proveedor = frame.locator("#det-proveedor")
+checkbox_todas_sucursales = frame.locator("#det-todas-sucursales")
+
+nombre_original = campo_nombre.input_value()
+proveedor_original = select_proveedor.input_value()
+todas_sucursales_original = checkbox_todas_sucursales.is_checked()
+assert "Vega Rodriguez" in nombre_original, f"Nombre original inesperado (revisar si 1373 sigue siendo el mismo registro): {nombre_original!r}"
+
+try:
+    nombre_temporal = nombre_original + " - MODIFICADO CP048"
+    campo_nombre.fill(nombre_temporal)
+    select_proveedor.select_option(label="20206018411 - TECSUR S.A.")
+    app.wait_for_timeout(300)
+    capturar_paso(app, "datos_modificados_temporalmente", paso_excel=3)
+
+    frame.get_by_role("button", name=re.compile(r"^\\s*Grabar\\s*$")).click()
+    app.wait_for_timeout(1500)
+    _confirmar_grabar()
+    texto_grabado = frame.locator("body").inner_text()
+    capturar_paso(app, "grabacion_exitosa", paso_excel=4)
+    assert "grabaci" in texto_grabado.lower() and "exitosa" in texto_grabado.lower(), (
+        f"Se esperaba 'Grabaci\\u00f3n exitosa.': {texto_grabado[-400:]!r}"
+    )
+
+    for _ in range(6):
+        cerrado = False
+        for nombre_boton in ("Aceptar", "Cerrar"):
+            boton = frame.get_by_role("button", name=re.compile(rf"^\\s*{nombre_boton}\\s*$"))
+            if boton.count() and boton.first.is_visible():
+                boton.first.click(force=True)
+                app.wait_for_timeout(800)
+                cerrado = True
+        if not cerrado:
+            break
+
+    # DEFECTO REAL (confirmado en vivo 28/09/2026, re-verificado hoy):
+    # la grilla debe mostrar el Nombre/Proveedor actualizados, pero
+    # Sucursal y Area quedan SIN CAMBIOS pese a haber elegido otra
+    # Sucursal en el combo.
+    overlay2 = abrir_filtro_inspectores(app, frame)
+    overlay2.locator("#flt-codigo").fill("1373")
+    app.wait_for_timeout(300)
+    overlay2.locator("#flt-estado").select_option(value="S")
+    app.wait_for_timeout(300)
+    overlay2.get_by_role("button", name=re.compile(r"^\\s*Filtrar\\s*$")).click()
+    app.wait_for_timeout(3000)
+    capturar_paso(app, "defecto_real_sucursal_area_sin_cambios", paso_excel=5)
+
+    filas2 = filas_inspectores(frame)
+    assert filas2.count() > 0, "Se esperaba seguir encontrando el inspector 1373 tras modificar"
+    primera_fila_texto = filas2.first.inner_text()
+    assert "MODIFICADO CP048" in primera_fila_texto, (
+        f"Se esperaba ver el Nombre modificado en la grilla: {primera_fila_texto!r}"
+    )
+    assert "0000 - Sin Sucursal" in primera_fila_texto and "3521" in primera_fila_texto, (
+        f"DEFECTO REAL: se esperaba que Sucursal/Area quedaran SIN CAMBIOS "
+        f"('0000 - Sin Sucursal' / '3521') pese a la modificacion: {primera_fila_texto!r}"
+    )
+finally:
+    # RESTAURACION: corre siempre, pase lo que pase arriba.
+    overlay3 = abrir_filtro_inspectores(app, frame)
+    overlay3.locator("#flt-codigo").fill("1373")
+    app.wait_for_timeout(300)
+    overlay3.locator("#flt-estado").select_option(value="S")
+    app.wait_for_timeout(300)
+    overlay3.get_by_role("button", name=re.compile(r"^\\s*Filtrar\\s*$")).click()
+    app.wait_for_timeout(3000)
+    filas3 = filas_inspectores(frame)
+    assert filas3.count() > 0, "RESTAURACION: no se encontro el inspector 1373 para revertir los datos"
+    filas3.first.click()
+    app.wait_for_timeout(500)
+    frame.get_by_role("button", name=re.compile(r"^\\s*Detalles\\s*$")).click()
+    app.wait_for_timeout(1500)
+
+    frame.locator("#det-nombre").fill(nombre_original)
+    frame.locator("#det-proveedor").select_option(value=proveedor_original)
+    app.wait_for_timeout(300)
+    capturar_paso(app, "restaurando_valores_originales", paso_excel=6)
+
+    frame.get_by_role("button", name=re.compile(r"^\\s*Grabar\\s*$")).click()
+    app.wait_for_timeout(1500)
+    _confirmar_grabar()
+    texto_restaurado = frame.locator("body").inner_text()
+    capturar_paso(app, "restauracion_confirmada", paso_excel=7)
+    assert "grabaci" in texto_restaurado.lower() and "exitosa" in texto_restaurado.lower(), (
+        f"RESTAURACION: se esperaba 'Grabaci\\u00f3n exitosa.' al revertir, pero: {texto_restaurado[-400:]!r}"
+    )
+
+    for _ in range(6):
+        cerrado2 = False
+        for nombre_boton in ("Aceptar", "Cerrar"):
+            boton = frame.get_by_role("button", name=re.compile(rf"^\\s*{nombre_boton}\\s*$"))
+            if boton.count() and boton.first.is_visible():
+                boton.first.click(force=True)
+                app.wait_for_timeout(800)
+                cerrado2 = True
+        if not cerrado2:
+            break
+
+    overlay4 = abrir_filtro_inspectores(app, frame)
+    overlay4.locator("#flt-codigo").fill("1373")
+    app.wait_for_timeout(300)
+    overlay4.locator("#flt-estado").select_option(value="S")
+    app.wait_for_timeout(300)
+    overlay4.get_by_role("button", name=re.compile(r"^\\s*Filtrar\\s*$")).click()
+    app.wait_for_timeout(3000)
+    capturar_paso(app, "estado_final_restaurado", paso_excel=8)
+    filas4 = filas_inspectores(frame)
+    if filas4.count() > 0:
+        texto_final = filas4.first.inner_text()
+        assert "MODIFICADO CP048" not in texto_final, (
+            f"RESTAURACION INCOMPLETA: el nombre modificado sigue visible: {texto_final!r}"
+        )
 '''
 
 # RF-07 "Consulta de Cortes Pendientes" (CP049-CP056) - bodies reales,
@@ -1374,28 +1954,61 @@ assert resultado and "alg" in resultado.lower() and "filtro" in resultado.lower(
 capturar_paso(app, "mensaje_filtro_obligatorio", paso_excel=1)
 '''
 
-_MOTIVO_BLOQUEO_RF07_FECHA = (
-    "DEFECTO REAL confirmado en vivo el 28/09/2026: ingresar una fecha "
-    "calendario VALIDA en el filtro F. Corte congela la pantalla por "
-    "completo (reproducido 5 veces, con press_sequentially, .fill(), "
-    "click en el calendario visual y click en el boton 'Hoy', tanto en "
-    "modo '=' como 'Entre' - ningun metodo de interaccion lo evita). No "
-    "hay excepcion de JS, error de consola, ni dialogo nativo bloqueante "
-    "- el popup simplemente deja de responder a cualquier operacion "
-    "(screenshot, input_value, nuevos clicks) por 30s+. Una fecha "
-    "INVALIDA (CP050) o el campo vacio (CP051) NO producen el freeze - "
-    "es especifico de un valor de fecha calendario real. Ver ficha "
-    "tecnica de _framework/modulos/consulta_cortes_pendientes.py para el "
-    "detalle completo - reportar como defecto real, no reintentar sin un "
-    "cambio en el ambiente."
-)
+# CORRECCION 02/11/2026 (ver _exploracion/explore_88_rf07_revalidar_freeze.py,
+# explore_89_rf07_entre_campos.py, explore_90_rf07_cp053_rango.py): el
+# freeze del date-picker confirmado 28/09/2026 (congelaba 30s+ al
+# ingresar una fecha calendario valida) YA NO SE REPRODUCE - escribir la
+# fecha, hacer screenshot y leer el valor terminan en <2s. Mismo patron
+# de recuperacion ya visto en CP008/CP039/CP046 de este mismo proyecto.
+# Confirmado en vivo el flujo completo de ambos casos con los mensajes
+# EXACTOS del EF.
 
-CUERPOS_REALES["CP052"] = f'''
-raise NotImplementedError("CP052 (RF-07 - Rango superior obligatorio en filtro Entre): {_MOTIVO_BLOQUEO_RF07_FECHA}")
+CUERPOS_REALES["CP052"] = '''
+app, frame = abrir_consulta_cortes_pendientes(page, paso_excel=1)
+frame.locator("#fld-tipo-fecha").click()
+app.wait_for_timeout(500)
+frame.locator(".ant-select-item-option").filter(has_text="Entre").first.click()
+app.wait_for_timeout(500)
+
+campo_ini = frame.get_by_label("Fecha inicial")
+campo_ini.click()
+campo_ini.press_sequentially("01/01/2026", delay=80)
+app.wait_for_timeout(500)
+capturar_paso(app, "entre_con_fecha_inicial_sin_final", paso_excel=1)
+
+frame.get_by_role("button", name=re.compile("Leer")).click()
+app.wait_for_timeout(2000)
+modal = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile("."))
+assert modal.count() and modal.first.is_visible(), "Se esperaba la Ventana de Validacion de rango incompleto"
+mensaje = modal.first.inner_text()
+capturar_paso(app, "mensaje_rango_superior_obligatorio", paso_excel=2)
+assert "rango superior" in mensaje.lower(), f"Mensaje inesperado: {mensaje!r}"
 '''
 
-CUERPOS_REALES["CP053"] = f'''
-raise NotImplementedError("CP053 (RF-07 - Rango de fechas amplio): {_MOTIVO_BLOQUEO_RF07_FECHA}")
+CUERPOS_REALES["CP053"] = '''
+app, frame = abrir_consulta_cortes_pendientes(page, paso_excel=1)
+frame.locator("#fld-tipo-fecha").click()
+app.wait_for_timeout(500)
+frame.locator(".ant-select-item-option").filter(has_text="Entre").first.click()
+app.wait_for_timeout(500)
+
+campo_ini = frame.get_by_label("Fecha inicial")
+campo_fin = frame.get_by_label("Fecha final")
+campo_ini.click()
+campo_ini.press_sequentially("01/01/2026", delay=80)
+app.wait_for_timeout(300)
+campo_fin.click()
+campo_fin.press_sequentially("01/06/2026", delay=80)  # 151 dias, supera el maximo de 60
+app.wait_for_timeout(500)
+capturar_paso(app, "rango_mayor_a_60_dias", paso_excel=1)
+
+frame.get_by_role("button", name=re.compile("Leer")).click()
+app.wait_for_timeout(2000)
+modal = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile("."))
+assert modal.count() and modal.first.is_visible(), "Se esperaba la Ventana de Validacion de rango excedido"
+mensaje = modal.first.inner_text()
+capturar_paso(app, "mensaje_rango_excedido", paso_excel=2)
+assert "60" in mensaje and "d" in mensaje.lower() and "m" in mensaje.lower(), f"Mensaje inesperado: {mensaje!r}"
 '''
 
 CUERPOS_REALES["CP055"] = '''
@@ -1678,24 +2291,300 @@ capturar_paso(app, "solicitud_anulada", paso_excel=4)
 assert "anulada" in mensaje_final.lower(), f"Mensaje final inesperado: {mensaje_final!r}"
 '''
 
-CUERPOS_REALES["CP064"] = f'''
-raise NotImplementedError("CP064 (RF-09 - Búsqueda exitosa usando únicamente el filtro de fecha): {_MOTIVO_BLOQUEO_RF09_FECHA}")
+# CORRECCION 02/11/2026 (ver _exploracion/explore_91_rf09_revalidar_freeze.py,
+# explore_92_rf09_cp068_069_071.py): el freeze del date-picker confirmado
+# 28/09/2026 YA NO SE REPRODUCE en esta pantalla tampoco - mismo patron
+# de recuperacion que RF-07 (ver _MOTIVO_BLOQUEO_RF07_FECHA, ya
+# historico). Confirmados en vivo: CP064 (fecha "=" 02/11/2026, solo
+# filtro de fecha, trae 1 resultado real: suministro 2353914, solicitud
+# 872378, INGRESADO), CP068 ("Debe Seleccionar Rango Superior de Fecha"),
+# CP069 ("Error, Rango de Fechas Debe Ser Como Máximo 31 Días"), CP071
+# ("No existen datos de la consulta" con fecha 01/01/2000).
+
+CUERPOS_REALES["CP064"] = '''
+app, frame = abrir_consulta_generica_reposiciones(page, paso_excel=1)
+frame.locator("#fldTipoFecha").click()
+app.wait_for_timeout(500)
+frame.locator(".ant-select-item-option").filter(has_text="=").first.click()
+app.wait_for_timeout(500)
+frame.locator("#fldFechaIni").click()
+frame.locator("#fldFechaIni").press_sequentially("02/11/2026", delay=80)
+app.wait_for_timeout(500)
+capturar_paso(app, "solo_filtro_de_fecha", paso_excel=1)
+
+frame.get_by_role("button", name=re.compile("Leer")).click()
+plazo = time.monotonic() + 45
+resultado = None
+while time.monotonic() < plazo:
+    modal = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile("."))
+    if modal.count() and modal.first.is_visible():
+        resultado = ("modal", modal.first.inner_text())
+        break
+    texto = frame.locator("body").inner_text()
+    if "total registros" in texto.lower():
+        resultado = ("completo", texto)
+        break
+    app.wait_for_timeout(1000)
+assert resultado is not None, "La busqueda no termino en 45s"
+assert resultado[0] == "completo", f"No se esperaba un modal (busqueda solo con fecha): {resultado[1]!r}"
+capturar_paso(app, "resultado_solo_con_fecha", paso_excel=2)
+assert "total registros: 0" not in resultado[1].lower(), (
+    f"Se esperaba al menos 1 resultado real con solo el filtro de fecha: {resultado[1][-300:]!r}"
+)
 '''
 
-CUERPOS_REALES["CP068"] = f'''
-raise NotImplementedError("CP068 (RF-09 - Rango superior obligatorio en filtro Entre): {_MOTIVO_BLOQUEO_RF09_FECHA}")
+CUERPOS_REALES["CP068"] = '''
+app, frame = abrir_consulta_generica_reposiciones(page, paso_excel=1)
+frame.locator("#fldTipoFecha").click()
+app.wait_for_timeout(500)
+frame.locator(".ant-select-item-option").filter(has_text="Entre").first.click()
+app.wait_for_timeout(500)
+frame.locator("#fldFechaIni").click()
+frame.locator("#fldFechaIni").press_sequentially("01/01/2026", delay=80)
+app.wait_for_timeout(500)
+capturar_paso(app, "entre_con_fecha_inicial_sin_final", paso_excel=1)
+
+frame.get_by_role("button", name=re.compile("Leer")).click()
+app.wait_for_timeout(2500)
+modal = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile("."))
+assert modal.count() and modal.first.is_visible(), "Se esperaba la Ventana de Validacion de rango incompleto"
+mensaje = modal.first.inner_text()
+capturar_paso(app, "mensaje_rango_superior_obligatorio", paso_excel=2)
+assert "rango superior" in mensaje.lower(), f"Mensaje inesperado: {mensaje!r}"
 '''
 
-CUERPOS_REALES["CP069"] = f'''
-raise NotImplementedError("CP069 (RF-09 - Rango de fechas amplio): {_MOTIVO_BLOQUEO_RF09_FECHA}")
+CUERPOS_REALES["CP069"] = '''
+app, frame = abrir_consulta_generica_reposiciones(page, paso_excel=1)
+frame.locator("#fldTipoFecha").click()
+app.wait_for_timeout(500)
+frame.locator(".ant-select-item-option").filter(has_text="Entre").first.click()
+app.wait_for_timeout(500)
+frame.locator("#fldFechaIni").click()
+frame.locator("#fldFechaIni").press_sequentially("01/01/2026", delay=80)
+app.wait_for_timeout(300)
+frame.locator("#fldFechaFin").click()
+frame.locator("#fldFechaFin").press_sequentially("15/03/2026", delay=80)  # 73 dias, supera el maximo de 31
+app.wait_for_timeout(500)
+capturar_paso(app, "rango_mayor_a_31_dias", paso_excel=1)
+
+frame.get_by_role("button", name=re.compile("Leer")).click()
+app.wait_for_timeout(2500)
+modal = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile("."))
+assert modal.count() and modal.first.is_visible(), "Se esperaba la Ventana de Validacion de rango excedido"
+mensaje = modal.first.inner_text()
+capturar_paso(app, "mensaje_rango_excedido", paso_excel=2)
+assert "31" in mensaje and "d" in mensaje.lower() and "m" in mensaje.lower(), f"Mensaje inesperado: {mensaje!r}"
 '''
 
-CUERPOS_REALES["CP070"] = f'''
-raise NotImplementedError("CP070 (RF-09 - Consulta genérica incluye solicitudes anuladas): {_MOTIVO_BLOQUEO_RF09_FECHA}")
+# CP070 DESTRABADO 02/11/2026: como no se encontro ninguna solicitud ya
+# Anulada en 9 rangos probados, se genero el dato real anulando una
+# solicitud pendiente real via RF-08 (ver
+# _exploracion/explore_98_rf08_anular_499575.py - cliente 1964154,
+# N. Solicitud 499575, Sucursal Cañete, "Operación Exitosa - Solicitud
+# de Reposición Anulada" confirmado). Verificado luego en esta pantalla
+# (ver _exploracion/explore_100_rf09_entre_mayo2025.py) que SI aparece
+# con Estado Solicitud = ANULADO - a diferencia de RF-08, que la hubiera
+# excluido del resultado tras la baja. Nota: filtrar solo por fecha NO
+# encontraba el registro (probado con "=" y con "Entre" acotado a la
+# fecha de Solicitud) - hizo falta combinar N. de Cliente + rango de
+# fecha para que el backend lo devolviera; no se investigo la causa
+# exacta de por que el filtro de fecha solo no alcanzaba.
+
+CUERPOS_REALES["CP070"] = '''
+app, frame = abrir_consulta_generica_reposiciones(page, paso_excel=1)
+frame.locator("#fldCliente").fill("1964154")
+app.wait_for_timeout(300)
+frame.locator("#fldTipoFecha").click()
+app.wait_for_timeout(500)
+frame.locator(".ant-select-item-option").filter(has_text="Entre").first.click()
+app.wait_for_timeout(500)
+frame.locator("#fldFechaIni").click()
+frame.locator("#fldFechaIni").press_sequentially("01/05/2025", delay=80)
+app.wait_for_timeout(300)
+frame.locator("#fldFechaFin").click()
+frame.locator("#fldFechaFin").press_sequentially("31/05/2025", delay=80)
+app.wait_for_timeout(500)
+capturar_paso(app, "filtro_cliente_y_rango_mayo_2025", paso_excel=1)
+
+frame.get_by_role("button", name=re.compile("Leer")).click()
+app.wait_for_timeout(4000)
+texto = frame.locator("body").inner_text()
+capturar_paso(app, "resultado_incluye_anulada", paso_excel=2)
+assert "499575" in texto, f"No se encontro la solicitud 499575 en el resultado: {texto[-400:]!r}"
+assert "ANULAD" in texto.upper(), (
+    f"Se esperaba ver el Estado Solicitud = ANULADO (a diferencia de RF-08, que la excluiria): {texto[-400:]!r}"
+)
 '''
 
-CUERPOS_REALES["CP071"] = f'''
-raise NotImplementedError("CP071 (RF-09 - Búsqueda sin resultados): {_MOTIVO_BLOQUEO_RF09_FECHA}")
+CUERPOS_REALES["CP071"] = '''
+app, frame = abrir_consulta_generica_reposiciones(page, paso_excel=1)
+frame.locator("#fldTipoFecha").click()
+app.wait_for_timeout(500)
+frame.locator(".ant-select-item-option").filter(has_text="=").first.click()
+app.wait_for_timeout(500)
+frame.locator("#fldFechaIni").click()
+frame.locator("#fldFechaIni").press_sequentially("01/01/2000", delay=80)
+app.wait_for_timeout(500)
+capturar_paso(app, "fecha_sin_coincidencias", paso_excel=1)
+
+frame.get_by_role("button", name=re.compile("Leer")).click()
+app.wait_for_timeout(3000)
+texto = frame.locator("body").inner_text()
+capturar_paso(app, "mensaje_sin_resultados", paso_excel=2)
+assert "no existen datos de la consulta" in texto.lower(), f"Mensaje inesperado: {texto[-300:]!r}"
+'''
+
+# CP073 (RF-05) y CP074 (RF-03) agregados 02/11/2026 a partir de los
+# manuales de usuario subidos a Documentos/ - no estaban en la matriz
+# Excel original. Ver matriz_casos.json para el detalle de cada hallazgo
+# que originó el caso.
+
+CUERPOS_REALES["CP073"] = '''
+app, frame = abrir_consulta_pagos(page, paso_excel=1)
+elegir_nz_select(frame, app, "cboReferencia", "Otros Conceptos")
+app.wait_for_timeout(800)
+capturar_paso(app, "referencia_otros_conceptos", paso_excel=1)
+
+frame.locator("nz-select#cboOrigen").click()
+app.wait_for_timeout(500)
+opciones_origen = [o.strip() for o in frame.locator("nz-option-item, .ant-select-item-option").all_text_contents() if o.strip()]
+opciones_reales = [o for o in opciones_origen if o not in ("(todos)", "(no aplica)", "Todos", "(Todos)")]
+assert opciones_reales, f"No se encontro ningun valor real de Origen para elegir: {opciones_origen!r}"
+valor_origen = opciones_reales[0]
+frame.locator("nz-option-item, .ant-select-item-option").filter(has_text=re.compile(r"^\\s*" + re.escape(valor_origen) + r"\\s*$")).first.click()
+app.wait_for_timeout(500)
+origen_elegido = frame.locator("nz-select#cboOrigen").inner_text().strip()
+assert origen_elegido == valor_origen, f"No se aplico el valor de Origen elegido: {origen_elegido!r} != {valor_origen!r}"
+capturar_paso(app, "origen_elegido", paso_excel=2)
+
+elegir_nz_select(frame, app, "cboReferencia", "Actualización de Saldo")
+app.wait_for_timeout(800)
+capturar_paso(app, "referencia_cambiada_actualizacion_saldo", paso_excel=3)
+
+elegir_nz_select(frame, app, "cboReferencia", "Otros Conceptos")
+app.wait_for_timeout(800)
+origen_tras_volver = frame.locator("nz-select#cboOrigen").inner_text().strip()
+capturar_paso(app, "origen_tras_volver_a_otros_conceptos", paso_excel=4)
+assert origen_tras_volver == valor_origen, (
+    f"Segun el manual de usuario, Origen deberia conservar '{valor_origen}' tras volver a Otros Conceptos sin tocarlo, "
+    f"pero quedo en {origen_tras_volver!r}"
+)
+'''
+
+CUERPOS_REALES["CP074"] = '''
+app, frame = abrir_cortes_reconexiones(page, paso_excel=1)
+frame.locator("select").nth(0).select_option(index=1)
+fechas = frame.locator("input[type=date]")
+fechas.nth(0).fill("2026-01-01")
+fechas.nth(1).fill("2026-03-01")  # 59 dias, supera el limite de 15
+capturar_paso(app, "motivo_y_rango_mayor_a_15_dias", paso_excel=2)
+
+tipo, mensaje = leer_cortes_reconexiones(app, frame, aceptar_confirmacion=True)
+assert tipo == "validacion" and "15 d" in mensaje.lower(), (
+    f"Se esperaba activar el limite de 15 dias igual que CP022: tipo={tipo!r} mensaje={mensaje!r}"
+)
+capturar_paso(app, "limite_15_dias_activado", paso_excel=3)
+
+frame.locator("button", has_text=re.compile(r"^\\s*Limpiar\\s*$")).click()
+app.wait_for_timeout(1000)
+capturar_paso(app, "pantalla_despues_de_limpiar", paso_excel=4)
+
+# Segun el manual de usuario (seccion 3.4), el limite de 15 dias sigue
+# vigente por el resto de la sesion aunque Limpiar vacie los demas
+# filtros. Repetimos el MISMO rango de 59 dias sin volver a elegir
+# ningun motivo, para comprobar si el limite realmente sobrevive.
+fechas = frame.locator("input[type=date]")
+fechas.nth(0).fill("2026-01-01")
+fechas.nth(1).fill("2026-03-01")
+capturar_paso(app, "mismo_rango_sin_motivo_tras_limpiar", paso_excel=5)
+
+tipo2, mensaje2 = leer_cortes_reconexiones(app, frame, aceptar_confirmacion=True)
+capturar_paso(app, "resultado_tras_limpiar", paso_excel=6)
+assert tipo2 == "validacion" and "15 d" in mensaje2.lower() and "máximo" in mensaje2.lower(), (
+    f"Segun el manual de usuario, el limite de 15 dias deberia seguir vigente pese a Limpiar y sin motivo seleccionado, "
+    f"pero el resultado fue: tipo={tipo2!r} mensaje={mensaje2!r}"
+)
+'''
+
+# CP075/CP076 (RF-05) agregados 02/11/2026 a partir de exploracion en vivo
+# (explore_65_rf05_otras_referencias.py) - no estaban en la matriz Excel
+# original. Encargos de Cobranza SI tiene datos reales con Fecha <=
+# 01/01/2023 (cliente 573750, oficina 0010, cajero 0005, lote 12319,
+# concepto PLZ, encargo 0002). Cobranza Externa da SIEMPRE "Error de
+# Servicio: Error en consulta." - mismo patron de defecto real que
+# CP034 (No Ubicados).
+
+CUERPOS_REALES["CP075"] = '''
+app, frame = abrir_consulta_pagos(page, paso_excel=1)
+elegir_nz_select(frame, app, "cboReferencia", "Encargos de Cobranza")
+app.wait_for_timeout(800)
+elegir_nz_select(frame, app, "cboFechaOperador", "<=")
+app.wait_for_timeout(400)
+frame.locator("#txtFechaInicial").fill("2023-01-01")
+capturar_paso(app, "encargos_de_cobranza_antes_de_leer", paso_excel=1)
+
+frame.locator("button", has_text=re.compile(r"^\\s*(Leer|Siguiente)\\s*$")).click()
+app.wait_for_timeout(2000)
+modal = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile(".", re.S))
+if modal.count() and modal.first.is_visible() and "confirmaci" in modal.first.inner_text().lower():
+    modal.first.get_by_role("button", name=re.compile("Aceptar", re.I)).click()
+    app.wait_for_timeout(2500)
+
+plazo = time.monotonic() + 60
+filas = 0
+while time.monotonic() < plazo:
+    filas = frame.locator("tr").count()
+    if filas > 2:
+        break
+    app.wait_for_timeout(2000)
+assert filas > 2, "No se cargo ningun resultado real de Encargos de Cobranza"
+capturar_paso(app, "resultado_encargos_de_cobranza", paso_excel=3)
+
+# Columna propia de "Encargos de Cobranza": Encargo con dato real
+# (distinta a las demas referencias, confirmado en vivo con "0002" -
+# indice 15: F.Ingreso,F.Pago,Importe,Oficina,Cajero,N.Lote,Cpto.,
+# N.Cliente,Sector,Suc.Cli.,Estado,F.Retiro,Tipo Dcto.,Libro,N.Dcto.,Encargo,Cuotas Pag.).
+primera_fila = frame.locator("table").first.locator("tbody tr, tr").nth(1).inner_text()
+celdas = primera_fila.split("\\t")
+assert len(celdas) >= 16 and celdas[15].strip() not in ("", "—"), (
+    f"Se esperaba la columna Encargo (indice 15) con dato real: {primera_fila!r}"
+)
+'''
+
+CUERPOS_REALES["CP076"] = '''
+app, frame = abrir_consulta_pagos(page, paso_excel=1)
+elegir_nz_select(frame, app, "cboReferencia", "Cobranza Externa")
+app.wait_for_timeout(800)
+elegir_nz_select(frame, app, "cboFechaOperador", "<=")
+app.wait_for_timeout(400)
+frame.locator("#txtFechaInicial").fill("2023-01-01")
+capturar_paso(app, "cobranza_externa_antes_de_leer", paso_excel=1)
+
+frame.locator("button", has_text=re.compile(r"^\\s*(Leer|Siguiente)\\s*$")).click()
+app.wait_for_timeout(2000)
+modal = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile(".", re.S))
+if modal.count() and modal.first.is_visible() and "confirmaci" in modal.first.inner_text().lower():
+    modal.first.get_by_role("button", name=re.compile("Aceptar", re.I)).click()
+    app.wait_for_timeout(2500)
+
+# DEFECTO REAL confirmado en vivo 02/11/2026: el backend responde
+# "Error de Servicio: Error en consulta." para Cobranza Externa sin
+# importar el filtro de fecha - mismo patron ya confirmado en CP034
+# (No Ubicados), segunda referencia de las 5 con este defecto.
+plazo = time.monotonic() + 30
+texto_error = ""
+while time.monotonic() < plazo:
+    modal = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile(".", re.S))
+    if modal.count() and modal.first.is_visible():
+        texto_error = modal.first.inner_text()
+        if "confirmaci" not in texto_error.lower():
+            break
+    app.wait_for_timeout(1000)
+assert texto_error and "confirmaci" not in texto_error.lower(), (
+    f"Se esperaba el modal de error real de 'Cobranza Externa' (no la confirmacion ya aceptada): {texto_error!r}"
+)
+capturar_paso(app, "defecto_real_error_en_consulta_cobranza_externa", paso_excel=4)
+assert "error en consulta" in texto_error.lower(), f"Mensaje de error inesperado: {texto_error!r}"
 '''
 
 # RF-02/03/04/06 requieren la cuenta DCABA_DW (le faltan roles funcionales
@@ -1709,7 +2598,12 @@ raise NotImplementedError("CP071 (RF-09 - Búsqueda sin resultados): {_MOTIVO_BL
 # casos de esa corrida) pero SI aparece y abre bien con DCABA_DW -
 # mismo patron ya visto en otras RF de este proyecto (rol/acceso
 # presente en una cuenta y no en la otra).
-_CPS_DCABA_DW = {f"CP{n:03d}" for n in range(9, 25)} | {f"CP{n:03d}" for n in range(25, 38)} | {f"CP{n:03d}" for n in range(38, 64)} | {"CP072"}
+#
+# CP064-071 (RF-09) agregado 02/11/2026: mismo problema que RF-07 nunca
+# se habia corregido aca - CP065/066/067 (que no dependen del defecto del
+# date-picker) fallaban con el mismo RuntimeError de menu no visible con
+# SCASTI_DW. Se mueven al mismo grupo DCABA_DW.
+_CPS_DCABA_DW = {f"CP{n:03d}" for n in range(9, 25)} | {f"CP{n:03d}" for n in range(25, 38)} | {f"CP{n:03d}" for n in range(38, 72)} | {"CP072", "CP073", "CP074", "CP075", "CP076"}
 
 # --- Un add() por cada uno de los 72 casos de matriz_casos.json, en orden ---
 for _cp in sorted(MATRIZ, key=lambda x: int(x[2:])):

@@ -1,0 +1,90 @@
+{
+  "CP001": {
+    "rf": "RF-1\nRF-2\nRF-3\nRF-4",
+    "cu": "CU-01",
+    "cp": "CP001",
+    "name": "Obtener Sucursales",
+    "desc": "Obtiene los sucursales",
+    "precond": "1. la url de pruebas empieza con \"pldsapp3\" y desarrollo con \"dldsapp3\". Tener en cuenta al momento de realizar la prueba.\n2. poder realizar select, update en el ambiente de pruebas.\n3. permisos al log \"\\\\dldssyslog\" para verificar por log si es necesario.\n4.Nombre del archivo log es LuzdelSur.Comercial.WebExtCom.General.Svc",
+    "datos": "",
+    "esperado": "Muestra la lista de sucursales",
+    "pasos": "1. Abrir la aplicación de insomnia o postman.\n2. Colocar la url: http://dldsapp3/Comercial/WebExtCom/WebExtCom/General/General.svc/General/ObtenerSucursales\n si es en ambiente de pruebas cambiar el dldsapp3 por pldsapp3\n3. En el body colocar el json (se encuentra en el archivo json y tambien en la imagen del documentos de pruebas).\n4. Nota : se esta adjuntado el archivo \"WebExtCom.General.json\" para importar en postman y solo cambiar datos como la sesion en el header"
+  },
+  "CP002": {
+    "rf": "RF-1\nRF-2\nRF-3\nRF-4",
+    "cu": "CU-01",
+    "cp": "CP002",
+    "name": "Obtener Listado Distritos",
+    "desc": "Obtiene listado de distritos",
+    "precond": "1. la url de pruebas empieza con \"pldsapp3\" y desarrollo con \"dldsapp3\". Tener en cuenta al momento de realizar la prueba.\n2. poder realizar select, update en el ambiente de pruebas.\n3. permisos al log \"\\\\dldssyslog\" para verificar por log si es necesario.\n4.Nombre del archivo log es LuzdelSur.Comercial.WebExtCom.General.Svc",
+    "datos": "",
+    "esperado": "Muestra la lista de distritos",
+    "pasos": "1. Abrir la aplicación de insomnia o postman.\n2. Colocar la url: http://dldsapp3/Comercial/WebExtCom/WebExtCom/General/General.svc/General/ObtenerListadoDistritos\n si es en ambiente de pruebas cambiar el dldsapp3 por pldsapp3\n3. En el body colocar el json (se encuentra en el archivo json y tambien en la imagen del documentos de pruebas).\n4. Nota : se esta adjuntado el archivo \"WebExtCom.General.json\" para importar en postman y solo cambiar datos como la sesion en el header"
+  },
+  "CP003": {
+    "rf": "RF-1\nRF-2\nRF-3\nRF-4",
+    "cu": "CU-01",
+    "cp": "CP003",
+    "name": "Obtener Agentes De Pago Por Distrito",
+    "desc": "Obtiene ubicación de los agentes de pago por distrito",
+    "precond": "1. la url de pruebas empieza con \"pldsapp3\" y desarrollo con \"dldsapp3\". Tener en cuenta al momento de realizar la prueba.\n2. conexión a la BD de \"GisLds1\" en el ambiente de pruebas.\n3. poder realizar select, update en el ambiente de pruebas.\n4. permisos al log \"\\\\dldssyslog\" para verificar por log si es necesario.\n5.Nombre del archivo log es LuzdelSur.Comercial.WebExtCom.General.Svc",
+    "datos": "",
+    "esperado": "Muestra la lista de agentes de pagos por distrito",
+    "pasos": "1. Abrir la aplicación de insomnia o postman.\n2. Colocar la url: http://dldsapp3/Comercial/WebExtCom/WebExtCom/General/General.svc/General/ObtenerAgentesDePagoPorDistrito\n si es en ambiente de pruebas cambiar el dldsapp3 por pldsapp3\n3. En el body colocar el json (se encuentra en el archivo json y tambien en la imagen del documentos de pruebas).\n4. Nota : se esta adjuntado el archivo \"WebExtCom.General.json\" para importar en postman y solo cambiar datos como la sesion en el header"
+  },
+  "CP004": {
+    "rf": "RF-1\nRF-2\nRF-3\nRF-4",
+    "cu": "CU-01",
+    "cp": "CP004",
+    "name": "Enviar Formulario Contacto",
+    "desc": "se envia una consulta a luz  a sur  como persona natural  con los datos ingresados",
+    "precond": "1. la url de pruebas empieza con \"pldsapp3\" y desarrollo con \"dldsapp3\". Tener en cuenta al momento de realizar la prueba.\n2. conexión a la BD de \"SrcRepo\" en el ambiente de pruebas.\n3. poder realizar select, update en el ambiente de pruebas.\n4. permisos al log \"\\\\dldssyslog\" para verificar por log si es necesario.\n5.Nombre del archivo log es LuzdelSur.Comercial.WebExtCom.General.Svc",
+    "datos": "",
+    "esperado": "Muestra mensaje de confirmación de la consulta",
+    "pasos": "1. Abrir la aplicación de insomnia o postman.\n2. Colocar la url: http://dldsapp3/Comercial/WebExtCom/WebExtCom/General/General.svc/General/EnviarFormularioContacto\n si es en ambiente de pruebas cambiar el dldsapp3 por pldsapp3\n3. En el body colocar el json (se encuentra en el archivo json y tambien en la imagen del documentos de pruebas).\n4. Nota : se esta adjuntado el archivo \"WebExtCom.General.json\" para importar en postman y solo cambiar datos como la sesion en el header"
+  },
+  "CP005": {
+    "rf": "RF-1\nRF-2\nRF-3\nRF-4",
+    "cu": "CU-01",
+    "cp": "CP005",
+    "name": "Enviar Formulario Contacto Cliente Libre",
+    "desc": "se envia una consulta a luz del sur  como empresa con los datos ingresados",
+    "precond": "1. la url de pruebas empieza con \"pldsapp3\" y desarrollo con \"dldsapp3\". Tener en cuenta al momento de realizar la prueba.\n2. poder realizar select, update en el ambiente de pruebas.\n3. permisos al log \"\\\\dldssyslog\" para verificar por log si es necesario.\n4.Nombre del archivo log es LuzdelSur.Comercial.WebExtCom.General.Svc",
+    "datos": "",
+    "esperado": "Muestra mensaje de confirmación de la consulta",
+    "pasos": "1. Abrir la aplicación de insomnia o postman.\n2. Colocar la url: http://dldsapp3/Comercial/WebExtCom/WebExtCom/General/General.svc/General/EnviarFormularioContactoClienteLibre\n si es en ambiente de pruebas cambiar el dldsapp3 por pldsapp3\n3. En el body colocar el json (se encuentra en el archivo json y tambien en la imagen del documentos de pruebas).\n4. Nota : se esta adjuntado el archivo \"WebExtCom.General.json\" para importar en postman y solo cambiar datos como la sesion en el header"
+  },
+  "CP006": {
+    "rf": "RF-1\nRF-2\nRF-3\nRF-4",
+    "cu": "CU-01",
+    "cp": "CP006",
+    "name": "Enviar Formulario Contacto Accionista",
+    "desc": "se envia una consulta a luz  del sur como accionista con los datos ingresados",
+    "precond": "1. la url de pruebas empieza con \"pldsapp3\" y desarrollo con \"dldsapp3\". Tener en cuenta al momento de realizar la prueba.\n2. poder realizar select, update en el ambiente de pruebas.\n3. permisos al log \"\\\\dldssyslog\" para verificar por log si es necesario.\n4.Nombre del archivo log es LuzdelSur.Comercial.WebExtCom.General.Svc",
+    "datos": "",
+    "esperado": "Muestra mensaje de confirmación de la consulta",
+    "pasos": "1. Abrir la aplicación de insomnia o postman.\n2. Colocar la url: http://dldsapp3/Comercial/WebExtCom/WebExtCom/General/General.svc/General/EnviarFormularioContactoAccionista\n si es en ambiente de pruebas cambiar el dldsapp3 por pldsapp3\n3. En el body colocar el json (se encuentra en el archivo json y tambien en la imagen del documentos de pruebas).\n4. Nota : se esta adjuntado el archivo \"WebExtCom.General.json\" para importar en postman y solo cambiar datos como la sesion en el header"
+  },
+  "CP007": {
+    "rf": "RF-1\nRF-2\nRF-3\nRF-4",
+    "cu": "CU-01",
+    "cp": "CP007",
+    "name": "Enviar Formulario Contacto Proveedor",
+    "desc": "se envia una consulta a luz  del sur como proveedor con los datos ingresados",
+    "precond": "1. la url de pruebas empieza con \"pldsapp3\" y desarrollo con \"dldsapp3\". Tener en cuenta al momento de realizar la prueba.\n2. poder realizar select, update en el ambiente de pruebas.\n3. permisos al log \"\\\\dldssyslog\" para verificar por log si es necesario.\n4.Nombre del archivo log es LuzdelSur.Comercial.WebExtCom.General.Svc",
+    "datos": "",
+    "esperado": "Muestra mensaje de confirmación de la consulta",
+    "pasos": "1. Abrir la aplicación de insomnia o postman.\n2. Colocar la url: http://dldsapp3/Comercial/WebExtCom/WebExtCom/General/General.svc/General/EnviarFormularioContactoProveedor\n si es en ambiente de pruebas cambiar el dldsapp3 por pldsapp3\n3. En el body colocar el json (se encuentra en el archivo json y tambien en la imagen del documentos de pruebas).\n4. Nota : se esta adjuntado el archivo \"WebExtCom.General.json\" para importar en postman y solo cambiar datos como la sesion en el header"
+  },
+  "CP008": {
+    "rf": "RF-1\nRF-2\nRF-3\nRF-4",
+    "cu": "CU-01",
+    "cp": "CP008",
+    "name": "Obtener Relación Suministro",
+    "desc": "Obtiene los tipos de relación de un cliente con respecto al suministro",
+    "precond": "1. la url de pruebas empieza con \"pldsapp3\" y desarrollo con \"dldsapp3\". Tener en cuenta al momento de realizar la prueba.\n2. poder realizar select, update en el ambiente de pruebas.\n3. permisos al log \"\\\\dldssyslog\" para verificar por log si es necesario.\n4.Nombre del archivo log es LuzdelSur.Comercial.WebExtCom.General.Svc",
+    "datos": "",
+    "esperado": "Muestra las relaciones de un suministro",
+    "pasos": "1. Abrir la aplicación de insomnia o postman.\n2. Colocar la url: http://dldsapp3/Comercial/WebExtCom/WebExtCom/General/General.svc/General/ObtenerRelacionSuministro\n si es en ambiente de pruebas cambiar el dldsapp3 por pldsapp3\n3. En el body colocar el json (se encuentra en el archivo json y tambien en la imagen del documentos de pruebas).\n4. Nota : se esta adjuntado el archivo \"WebExtCom.General.json\" para importar en postman y solo cambiar datos como la sesion en el header"
+  }
+}

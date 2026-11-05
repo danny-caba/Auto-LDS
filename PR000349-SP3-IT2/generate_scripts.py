@@ -104,8 +104,11 @@ def abrir_mantenedor_acciones_legacy(page, paso_excel=None):
     with page.expect_popup(timeout=15000) as popup_info:
         _click_visible(page, "Mantenedor De Acciones De Cortes")
     app = popup_info.value
-    app.wait_for_load_state("networkidle", timeout=20000)
-    app.wait_for_timeout(1500)
+    # Gotcha confirmado en vivo (pantalla legacy jQuery, igual que otras
+    # pantallas clasicas de este proyecto): "networkidle" nunca resuelve
+    # aca aunque la pagina cargue bien - usar "load" + espera fija.
+    app.wait_for_load_state("load", timeout=20000)
+    app.wait_for_timeout(2500)
     frame = app.locator("#aplicacion").content_frame if app.locator("#aplicacion").count() else app
     if paso_excel is not None:
         capturar_paso(app, "mantenedor_legacy_abierto", paso_excel=paso_excel)
@@ -2656,6 +2659,81 @@ capturar_paso(app, "proveedor_ya_no_aparece_en_grilla", paso_excel=4)
 assert fila_eliminada.count() == 0, (
     "El proveedor deberia haberse retirado de la grilla tras confirmar la eliminacion"
 )
+'''
+
+# CP061/CP063 RESUELTOS 30/10/2026: el bloqueo original ("falta cuenta
+# con alcance multi-sucursal") se destrabo asociando el rol DACD
+# (DCABA_DW) al area 23510 ("SUCURSAL CHACARILLA") desde la pantalla
+# legacy "Mantenimiento de Roles" (modulo Seguridad Xnear > Asignacion
+# de Roles), y confirmando en BD (Informix, tablas area/sucar/sucur)
+# que esa area comparte centro_servicio='0' con la sucursal de sesion
+# 0022 ("Solo pruebas PR000325 SP1 Ret", preexistente). El selector de
+# sucursal de RF-8 se activa solo cuando center_servicio del area tiene
+# mas de 1 sucursal real asociada - confirmado en vivo con 2 sucursales
+# reales (0022 y 3100-Chacarilla) SIN necesitar ningun dato sintetico.
+# Sucursal de sesion preseleccionada real: "3100 - Chacarilla" (6
+# proveedores reales ya conocidos de otros casos de este RF). La otra
+# opcion real del combo, "0022 - Solo pruebas PR000325 SP1 Ret", esta
+# vacia (0 proveedores) - sirve igual para probar CP063 (recarga de
+# grilla al cambiar de sucursal) sin necesitar un 2do dato de
+# proveedores real.
+
+CUERPOS_REALES["CP061"] = '''
+app, frame = abrir_rf08(page, paso_excel=1)
+app.wait_for_timeout(1500)
+capturar_paso(app, "pantalla_inicial_con_selector", paso_excel=2)
+
+selector_sucursal = frame.locator("nz-select, select").first
+assert selector_sucursal.count() > 0, "Se esperaba un selector de sucursal visible (alcance multi-sucursal)"
+assert selector_sucursal.is_visible() and selector_sucursal.is_enabled(), (
+    "El selector de sucursal deberia estar visible y habilitado"
+)
+
+texto_preseleccion = selector_sucursal.inner_text()
+assert "3100" in texto_preseleccion or "Chacarilla" in texto_preseleccion, (
+    f"Se esperaba la sucursal de sesion preseleccionada (3100 - Chacarilla): {texto_preseleccion!r}"
+)
+capturar_paso(app, "sucursal_de_sesion_preseleccionada", paso_excel=3)
+
+selector_sucursal.click()
+app.wait_for_timeout(500)
+opciones = frame.locator("nz-option-item, option")
+assert opciones.count() >= 2, f"Se esperaban al menos 2 sucursales reales en el combo, hubo {opciones.count()}"
+capturar_paso(app, "combo_de_sucursales_del_area_desplegado", paso_excel=3)
+frame.locator("body").press("Escape")
+app.wait_for_timeout(300)
+
+tabla = frame.locator("table, nz-table").first
+filas = filas_reales(tabla)
+assert filas.count() >= 1, "Se esperaba al menos un proveedor activo cargado en la grilla de la sucursal preseleccionada"
+capturar_paso(app, "grilla_de_proveedores_de_la_sucursal_preseleccionada", paso_excel=4)
+'''
+
+CUERPOS_REALES["CP063"] = '''
+app, frame = abrir_rf08(page, paso_excel=1)
+app.wait_for_timeout(1500)
+
+tabla = frame.locator("table, nz-table").first
+filas_chacarilla = filas_reales(tabla)
+cantidad_chacarilla = filas_chacarilla.count()
+assert cantidad_chacarilla >= 1, "Se esperaba la grilla de la sucursal 3100-Chacarilla con proveedores reales"
+capturar_paso(app, "proveedores_de_chacarilla_3100", paso_excel=2)
+
+selector_sucursal = frame.locator("nz-select, select").first
+selector_sucursal.click()
+app.wait_for_timeout(500)
+opcion_0022 = frame.locator("nz-option-item, option").filter(has_text="0022")
+assert opcion_0022.count() > 0, "No se encontro la sucursal 0022 en el combo del area"
+opcion_0022.first.click()
+app.wait_for_timeout(2000)
+capturar_paso(app, "sucursal_cambiada_a_0022", paso_excel=3)
+
+tabla2 = frame.locator("table, nz-table").first
+filas_0022 = filas_reales(tabla2)
+assert filas_0022.count() != cantidad_chacarilla or filas_0022.count() == 0, (
+    f"La grilla deberia recargarse con datos distintos al cambiar de sucursal (Chacarilla={cantidad_chacarilla}, 0022={filas_0022.count()})"
+)
+capturar_paso(app, "grilla_recargada_para_la_sucursal_0022", paso_excel=3)
 '''
 
 # RF-3 (continuacion): CP022/023/024 confirmados en vivo 22/10/2026.

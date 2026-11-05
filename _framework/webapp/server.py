@@ -38,7 +38,7 @@ STATIC_DIR = WEBAPP_DIR / "static"
 UPLOADS_DIR = WEBAPP_DIR / "_uploads"
 PUERTO = int(os.environ.get("WEBAPP_PORT", "8765"))
 
-_RE_PROYECTO = re.compile(r"^(PR|IP|MS)\d{6}(-SP\d+)?$")
+_RE_PROYECTO = re.compile(r"^(PR|IP|MS)\d{6}(-SP\d+)?(-IT\d+)?$")
 
 _CONTENT_TYPES = {
     ".html": "text/html; charset=utf-8",
@@ -125,6 +125,14 @@ class Handler(BaseHTTPRequestHandler):
             if m:
                 self._get_rf(unquote(m.group(1)))
                 return
+            m = re.match(r"^/api/matriz/([^/]+)$", ruta)
+            if m:
+                self._get_matriz(unquote(m.group(1)))
+                return
+            m = re.match(r"^/api/documento-excel/([^/]+)$", ruta)
+            if m:
+                self._get_documento_excel(unquote(m.group(1)))
+                return
             m = re.match(r"^/api/reporte/([^/]+)$", ruta)
             if m:
                 self._get_reporte(unquote(m.group(1)))
@@ -170,6 +178,45 @@ class Handler(BaseHTTPRequestHandler):
                 entrada["cp_generados"] += 1
         rfs = [por_rf[k] for k in sorted(por_rf, key=lambda r: (len(r), r))]
         self._json({"rf": rfs})
+
+    def _get_matriz(self, proyecto: str):
+        try:
+            _validar_proyecto(proyecto)
+        except ValueError as e:
+            self._error_json(400, str(e))
+            return
+        pdir = procesos.proyecto_dir(proyecto)
+        matriz_path = pdir / "matriz_casos.json"
+        if not matriz_path.exists():
+            self._error_json(404, "El proyecto no tiene matriz_casos.json todavia")
+            return
+        matriz = json.loads(matriz_path.read_text(encoding="utf-8"))
+        casos = [
+            {"cp": cp, **info}
+            for cp, info in sorted(matriz.items(), key=lambda kv: (len(kv[1].get("rf", "")), kv[1].get("rf", ""), kv[0]))
+        ]
+        excel_existe = any((pdir / "documentos").glob("*.xlsx")) if (pdir / "documentos").is_dir() else False
+        self._json({"casos": casos, "tiene_excel_original": excel_existe})
+
+    def _get_documento_excel(self, proyecto: str):
+        try:
+            _validar_proyecto(proyecto)
+        except ValueError as e:
+            self._error_json(400, str(e))
+            return
+        documentos_dir = procesos.proyecto_dir(proyecto) / "documentos"
+        candidatos = sorted(documentos_dir.glob("*.xlsx")) if documentos_dir.is_dir() else []
+        if not candidatos:
+            self._error_json(404, "No se encontro el Excel original de este proyecto")
+            return
+        archivo = candidatos[0]
+        datos = archivo.read_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        self.send_header("Content-Disposition", f'attachment; filename="{archivo.name}"')
+        self.send_header("Content-Length", str(len(datos)))
+        self.end_headers()
+        self.wfile.write(datos)
 
     def _get_reporte(self, proyecto: str):
         try:

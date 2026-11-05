@@ -46,23 +46,19 @@ proyecto): la fila placeholder "No hay datos" (`tr.ant-table-placeholder`)
 cuenta como `<tr>` igual que la fila fantasma `ant-table-measure-now` -
 excluir AMBAS siempre al contar filas reales.
 
-**DEFECTO REAL confirmado en vivo (28/09/2026): ingresar una fecha
-CALENDARIO VALIDA en el filtro F. Corte congela la pantalla por
-completo** - reproducido 5 veces con metodos de interaccion distintos
-(`press_sequentially`, `.fill()`, click en el calendario visual sobre un
-dia, click en el boton "Hoy") tanto en modo "=" como en modo "Entre".
-Sintomas: cualquier operacion posterior sobre el popup (`screenshot()`,
-`input_value()`, un nuevo `click()`) cuelga por 30s+ sin excepcion de
-JS ni error de consola ni llamada de red disparada (se descarto que sea
-un dialogo nativo bloqueante - no se detecto ninguno via
-`page.on("dialog")`). La ventana PRINCIPAL del portal (`page`, fuera del
-popup) sigue respondiendo con normalidad - el freeze es especifico del
-popup/pantalla. Una fecha INVALIDA (ej. "31/02/2026") o dejar el campo
-vacio NO producen el freeze (validan rapido, ver CP050/CP051). Esto
-bloquea cualquier caso de este modulo que necesite una fecha REAL para
-ejecutar una busqueda (ej. rango de fechas, filtro por fecha exacta
-valida) - documentar como defecto real a reportar, no reintentar mas sin
-un cambio real en el ambiente.
+**CORRECCION 02/11/2026 - el freeze del date-picker YA NO SE REPRODUCE.**
+El defecto original (28/09/2026: ingresar una fecha calendario VALIDA
+en el filtro F. Corte congelaba la pantalla 30s+, reproducido 5 veces
+con metodos de interaccion distintos) no se reproduce mas de un mes
+despues - escribir la fecha con `press_sequentially`, hacer `screenshot()`
+y leer `input_value()` terminan en <2s (ver
+_exploracion/explore_88_rf07_revalidar_freeze.py). Mismo patron de
+recuperacion ya visto en otras pantallas de PR000349-SP2 (servicio de
+informes de RF-01, backend de RF-02/03/05, servicio de ficha de RF-06).
+CP052/CP053 confirmados en vivo con los mensajes EXACTOS del EF
+("Debe Seleccionar Rango Superior de Fecha" / "Error, Rango de Fechas
+Debe Ser Como Máximo 60 Días"). Los campos de fecha se ubican con
+`frame.get_by_label("Fecha inicial")` / `"Fecha final"`.
 ============================================================================
 """
 

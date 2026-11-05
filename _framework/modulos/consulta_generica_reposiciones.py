@@ -26,23 +26,38 @@ Limpiar / "a Excel" (deshabilitado hasta tener resultado).
 - "Fecha Inválida" (RN-06, fecha con valor calendario inexistente)
 - "Debe Seleccionar Rango Inferior de Fecha" (RN-08, tipo elegido sin fecha inicial)
 
-**DEFECTO REAL CRITICO, confirmado en 2 PANTALLAS DISTINTAS del mismo
-proyecto (ver tambien `consulta_cortes_pendientes.py`): ingresar una
-fecha calendario VALIDA en cualquier campo de fecha de este tipo
-(`nz-date-picker` + input asociado) congela la pantalla por completo.**
-Reproducido aca con `press_sequentially` normal Y con delay de 300ms por
-caracter (descarta que sea un artefacto de automatizacion "demasiado
-rapida" - el freeze ocurre incluso escribiendo lento, a mitad de la
-cadena de caracteres). Sintoma identico al de RF-07: cualquier operacion
-posterior sobre el popup (`screenshot()`, etc.) cuelga 30s+ sin
-excepcion de JS, sin error de consola, sin dialogo nativo. Una fecha
-INVALIDA o el campo vacio NO producen el freeze (validan rapido). Dado
-que se reproduce IGUAL en 2 aplicativos Angular distintos (con
-estructura de date-picker ligeramente distinta en el HTML), es probable
-que sea un defecto compartido de una libreria/version de componente
-comun a varias pantallas de este sprint - **cualquier caso que necesite
-ingresar una fecha calendario real y valida en un filtro de este tipo
-queda bloqueado hasta que se resuelva en el ambiente.**
+**CORRECCION 02/11/2026 - el freeze del date-picker YA NO SE REPRODUCE
+en esta pantalla tampoco** (mismo patron de recuperacion que
+`consulta_cortes_pendientes.py`, ver su ficha tecnica). Confirmado en
+vivo: escribir fecha + screenshot + input_value() terminan en <2s;
+busqueda completa con solo el filtro de fecha (operador "=", fecha de
+hoy) trae resultados reales en pocos segundos (ver
+_exploracion/explore_91_rf09_revalidar_freeze.py). CP064/068/069/071
+confirmados con los mensajes EXACTOS del EF.
+
+**Dato real confirmado 02/11/2026**: fecha "=" 02/11/2026 (sin otro
+filtro) trae 1 solicitud real - suministro 2353914, N. Solicitud
+872378, Estado INGRESADO, Sucursal La República. Los datos reales de
+Pruebas estan muy concentrados cerca de la fecha del dia - se probaron
+9 rangos "Entre" de 31 dias distintos a lo largo de +1 año (dic/2025 a
+nov/2026) y la mayoria dio 0 registros.
+
+**CP070 (solicitudes Anuladas) destrabado generando el dato real**: no
+se encontro ninguna Anulada preexistente, asi que se anulo una
+solicitud pendiente real via RF-08 (cliente 1964154, N. Solicitud
+499575, Sucursal Cañete - ver
+_exploracion/explore_98_rf08_anular_499575.py). Confirmado que esta
+pantalla SI la muestra con Estado Solicitud = ANULADO (a diferencia de
+RF-08, que la excluye tras la baja) - ver
+_exploracion/explore_100_rf09_entre_mayo2025.py.
+
+**Gotcha de filtro de fecha confirmado en vivo**: filtrar SOLO por
+fecha (sin N. de Cliente) no encontraba el registro recien anulado, ni
+con operador "=" ni con "Entre" acotado a su Fecha Solicitud real
+(19/05/2025) - hizo falta combinar N. de Cliente + el rango de fecha
+para que el backend lo devolviera. No se investigo la causa exacta
+(posible que el filtro de fecha solo indexe por otra fecha interna
+distinta a "Fecha Solicitud").
 ============================================================================
 """
 

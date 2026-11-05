@@ -16,6 +16,7 @@ function mostrarVista(nombre) {
   document.querySelectorAll(".vista").forEach((v) => v.classList.add("oculto"));
   document.getElementById(`vista-${nombre}`).classList.remove("oculto");
   document.querySelectorAll(".tab-btn").forEach((b) => b.classList.toggle("activo", b.dataset.vista === nombre));
+  if (nombre === "excel") cargarProyectosEnSelect("excel-proyecto", onCambioProyectoExcel);
   if (nombre === "ejecutar") cargarProyectosEnSelect("ejecutar-proyecto", onCambioProyectoEjecutar);
   if (nombre === "reporte") cargarProyectosEnSelect("reporte-proyecto");
 }
@@ -211,6 +212,71 @@ document.getElementById("ejecutar-copiar").addEventListener("click", () => {
   texto.select();
   navigator.clipboard?.writeText(texto.value).catch(() => document.execCommand("copy"));
 });
+
+// ---------- Vista: Excel ----------
+
+async function onCambioProyectoExcel(proyecto) {
+  const cont = document.getElementById("excel-contenido");
+  const descargaBox = document.getElementById("excel-descarga-box");
+  if (!proyecto) { cont.innerHTML = ""; descargaBox.classList.add("oculto"); return; }
+  cont.innerHTML = "Cargando...";
+  try {
+    const datos = await apiGet(`/api/matriz/${encodeURIComponent(proyecto)}`);
+    cont.innerHTML = renderizarMatrizExcel(datos.casos);
+    if (datos.tiene_excel_original) {
+      document.getElementById("excel-descarga").href = `/api/documento-excel/${encodeURIComponent(proyecto)}`;
+      descargaBox.classList.remove("oculto");
+    } else {
+      descargaBox.classList.add("oculto");
+    }
+  } catch (e) {
+    cont.innerHTML = `(error cargando la matriz: ${e.message})`;
+    descargaBox.classList.add("oculto");
+  }
+}
+
+function _escapeHtml(texto) {
+  const div = document.createElement("div");
+  div.textContent = texto == null ? "" : String(texto);
+  return div.innerHTML;
+}
+
+function _formatearPasos(texto) {
+  if (!texto) return "";
+  // Un paso por linea independiente, sin importar como venga el texto
+  // origen: separa primero por salto de linea real; si algun bloque
+  // todavia trae varios pasos pegados en la misma linea (el Excel no
+  // siempre trae el salto de linea entre "N. ...Texto." y el siguiente
+  // "N+1."), los vuelve a separar buscando el patron "numero + punto"
+  // que arranca cada paso.
+  const lineas = String(texto).split(/\r?\n/).flatMap((linea) =>
+    linea.split(/(?=\d+\.\s)/).map((p) => p.trim()).filter(Boolean)
+  );
+  return lineas.map((linea) => `<div>${_escapeHtml(linea)}</div>`).join("");
+}
+
+function renderizarMatrizExcel(casos) {
+  if (!casos.length) return "<p>Este proyecto todavía no tiene casos en su matriz.</p>";
+  const filas = casos.map((c) => `
+    <tr>
+      <td>${_escapeHtml(c.rf)}</td>
+      <td>${_escapeHtml(c.cp)}</td>
+      <td>${_escapeHtml(c.cu)}</td>
+      <td>${_escapeHtml(c.name)}</td>
+      <td>${_escapeHtml(c.desc)}</td>
+      <td>${_escapeHtml(c.precond)}</td>
+      <td>${_escapeHtml(c.datos)}</td>
+      <td>${_escapeHtml(c.esperado)}</td>
+      <td class="col-pasos">${_formatearPasos(c.pasos)}</td>
+    </tr>`).join("");
+  return `
+    <p><em>${casos.length} caso(s)</em></p>
+    <table class="reporte">
+      <thead><tr><th>RF</th><th>CP</th><th>CU</th><th>Nombre</th><th>Descripción</th><th>Precondición</th><th>Datos</th><th>Resultado esperado</th><th class="col-pasos">Pasos</th></tr></thead>
+      <tbody>${filas}</tbody>
+    </table>
+  `;
+}
 
 // ---------- Vista: Ejecutar pruebas ----------
 
