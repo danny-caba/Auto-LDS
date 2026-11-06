@@ -34,7 +34,91 @@
       "estado": "VERIFICADO",
       "resumen": "La ruta de menu real para Informacion General NO es la que sugiere el texto corto del EF (\"Atencion Integral\" a secas) -...",
       "fuente": "Exploracion en vivo 31/10/2026 (_exploracion/explore_03 a explore_17)"
+    },
+    "CONO-0010": {
+      "tipo": "SOLUCION_TECNICA_COMPROBADA",
+      "modulo": "framework-general",
+      "estado": "VERIFICADO",
+      "resumen": "Pantallas LEGACY (jQuery/DataTables, sin Angular) nunca llegan a 'networkidle' - usar wait_for_load_state('load') + un w...",
+      "fuente": "Memoria de sesion - gotchas acumulados de automatizacion Web LDS"
+    },
+    "CONO-0011": {
+      "tipo": "SOLUCION_TECNICA_COMPROBADA",
+      "modulo": "framework-general",
+      "estado": "VERIFICADO",
+      "resumen": "Las tablas legacy estilo DataTables mantienen TODAS las filas en el DOM sin importar la paginacion visual - 'tbody tr' c...",
+      "fuente": "Memoria de sesion - gotchas acumulados de automatizacion Web LDS"
+    },
+    "CONO-0012": {
+      "tipo": "SOLUCION_TECNICA_COMPROBADA",
+      "modulo": "framework-general",
+      "estado": "VERIFICADO",
+      "resumen": "Overlays/modales de ng-zorro (nz-modal-container, cdk-overlay-*): puede haber mas de un overlay coexistiendo (incluyendo...",
+      "fuente": "Memoria de sesion - gotchas acumulados de automatizacion Web LDS"
+    },
+    "CONO-0013": {
+      "tipo": "SOLUCION_TECNICA_COMPROBADA",
+      "modulo": "framework-general",
+      "estado": "VERIFICADO",
+      "resumen": "Selects/nz-select de un formulario pueden nacer con disabled='' hasta que termina de cargar su catalogo via un servicio ...",
+      "fuente": "Memoria de sesion - gotchas acumulados de automatizacion Web LDS"
+    },
+    "CONO-0014": {
+      "tipo": "SOLUCION_TECNICA_COMPROBADA",
+      "modulo": "framework-general",
+      "estado": "VERIFICADO",
+      "resumen": "Mensajes de exito/error pueden aparecer como toast EFIMERO (no un modal persistente) - hay que sondear activamente (bucl...",
+      "fuente": "Memoria de sesion - gotchas acumulados de automatizacion Web LDS"
+    },
+    "CONO-0015": {
+      "tipo": "REGLA_DOCUMENTADA",
+      "modulo": "framework-general",
+      "estado": "VERIFICADO",
+      "resumen": "Al automatizar flujos de Ingresar/Eliminar (altas y bajas), el caso debe confirmar la alta/baja REAL de esa misma corrid...",
+      "fuente": "Memoria de sesion - convencion establecida tras varios falsos OK"
+    },
+    "CONO-0016": {
+      "tipo": "REGLA_DOCUMENTADA",
+      "modulo": "framework-general",
+      "estado": "PROVISIONAL",
+      "resumen": "Validar el status code HTTP real del backend (via app.on('response', ...)) solo en casos de error/validacion o cuando el...",
+      "fuente": "Memoria de sesion - feedback de usuario sobre cuando vale la pena"
+    },
+    "CONO-0017": {
+      "tipo": "COMPORTAMIENTO_OBSERVADO",
+      "modulo": "framework-general",
+      "estado": "VERIFICADO",
+      "resumen": "El selector de sucursal de una pantalla se activa cuando el centro_servicio del area asociada al ROL del usuario tiene 2...",
+      "fuente": "Memoria de sesion - investigacion en vivo multi-sucursal (varios proyectos)"
+    },
+    "CONO-0018": {
+      "tipo": "SOLUCION_TECNICA_COMPROBADA",
+      "modulo": "framework-general",
+      "estado": "VERIFICADO",
+      "resumen": "La VM bloquea pip/npm install por un proxy MITM (error SELF_SIGNED_CERT_IN_CHAIN) - para consultas a la BD Informix de W...",
+      "fuente": "Memoria de sesion - acceso a BD Informix"
+    },
+    "CONO-0019": {
+      "tipo": "DATO_DE_PRUEBA",
+      "modulo": "synergia-reclamos",
+      "estado": "PROVISIONAL",
+      "resumen": "Tablas reales de Synergia Reclamos (schema BD): csc_reclamo, csc_rclmo_est_act, csc_rclmo_req_adm, csc_acuerdo, cs_opera...",
+      "fuente": "Memoria de sesion - investigacion BD Synergia Reclamos"
+    },
+    "CONO-0020": {
+      "tipo": "COMPORTAMIENTO_OBSERVADO",
+      "modulo": "mac-atencion-integral",
+      "estado": "VERIFICADO",
+      "resumen": "El modulo MAC (Atencion Integral MAC) tuvo un 'Acceso Denegado' real por permiso faltante - quedo corregido del lado de ...",
+      "fuente": "Memoria de sesion - PR000335-SP5 cierre RF-04"
+    },
+    "CONO-0021": {
+      "tipo": "DATO_DE_PRUEBA",
+      "modulo": "framework-general",
+      "estado": "PROVISIONAL",
+      "resumen": "La cuenta SCASTI_DW (clave rotativa, ver generate_scripts.py de cada proyecto para la vigente) es reutilizable entre pro...",
+      "fuente": "Memoria de sesion - cuentas de prueba reutilizables"
     }
   },
-  "actualizado_en": "2026-10-31T16:57:26.552206"
+  "actualizado_en": "2026-11-06T05:36:57.036121"
 }

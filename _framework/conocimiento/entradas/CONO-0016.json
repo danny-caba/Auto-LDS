@@ -1,0 +1,18 @@
+{
+  "id": "CONO-0016",
+  "tipo": "REGLA_DOCUMENTADA",
+  "descripcion": "Validar el status code HTTP real del backend (via app.on('response', ...)) solo en casos de error/validacion o cuando el resultado en pantalla es sospechoso o ambiguo - no agregarlo como verificacion de rutina en todos los casos. Ante ambigüedad, cruzar con una segunda fuente independiente (ej. otra pantalla que consulte la misma tabla) antes de concluir.",
+  "modulo": "framework-general",
+  "ambiente": null,
+  "version": null,
+  "fuente": "Memoria de sesion - feedback de usuario sobre cuando vale la pena",
+  "requerimiento_origen": "PR000349-SP3-IT2",
+  "referencias_evidencia": [],
+  "estado": "PROVISIONAL",
+  "fecha_creacion": "2026-11-06",
+  "fecha_ultima_verificacion": null,
+  "condiciones_revalidacion": null,
+  "reemplaza": null,
+  "reemplazada_por": null,
+  "motivo_invalidacion": null
+}

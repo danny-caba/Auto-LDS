@@ -1,0 +1,18 @@
+{
+  "id": "CONO-0018",
+  "tipo": "SOLUCION_TECNICA_COMPROBADA",
+  "descripcion": "La VM bloquea pip/npm install por un proxy MITM (error SELF_SIGNED_CERT_IN_CHAIN) - para consultas a la BD Informix de Web LDS, usar DBeaver con el JRE + driver JDBC que ya estan en disco (no requiere instalar nada nuevo), en vez de intentar una libreria Python nueva.",
+  "modulo": "framework-general",
+  "ambiente": null,
+  "version": null,
+  "fuente": "Memoria de sesion - acceso a BD Informix",
+  "requerimiento_origen": "PR000326-SP2",
+  "referencias_evidencia": [],
+  "estado": "VERIFICADO",
+  "fecha_creacion": "2026-11-06",
+  "fecha_ultima_verificacion": "2026-11-06",
+  "condiciones_revalidacion": null,
+  "reemplaza": null,
+  "reemplazada_por": null,
+  "motivo_invalidacion": null
+}

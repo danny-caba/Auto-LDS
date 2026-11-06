@@ -1,0 +1,18 @@
+{
+  "id": "CONO-0017",
+  "tipo": "COMPORTAMIENTO_OBSERVADO",
+  "descripcion": "El selector de sucursal de una pantalla se activa cuando el centro_servicio del area asociada al ROL del usuario tiene 2+ sucursales reales (schema dbtecnica: rol.area -> sucar.area/centro_servicio (mismo empresa) -> sucur.centro_servicio, excluir sucursal IN ('0000','9999')). Con 1 sola sucursal real, el campo se muestra como texto fijo (sin selector). HALLAZGO CLAVE: el ambiente de Pruebas no tiene NINGUN area real con 2+ sucursales (query de 0 filas confirmada) - cualquier proyecto que necesite probar multisucursal real se topa con lo mismo. Solucion que SI funciono: insertar TEMPORALMENTE una fila en sucur (mismo centro_servicio que el area ya asignada al rol de prueba), correr el caso, y borrarla apenas se tiene la evidencia - sucar/sucur son tablas GLOBALES compartidas por todo Web LDS, revertir rapido. 2 hipotesis que NO funcionaron: sucursal='0000' en sucar NO es 'todas', es 'sin sucursal asignada' (rompe la pantalla); el area con sucursal '0022' parecio servir una vez pero no es reproducible (depende de un dato sintetico ajeno, no confirmar sin re-probar primero).",
+  "modulo": "framework-general",
+  "ambiente": null,
+  "version": null,
+  "fuente": "Memoria de sesion - investigacion en vivo multi-sucursal (varios proyectos)",
+  "requerimiento_origen": "PR000349-SP3-IT2",
+  "referencias_evidencia": [],
+  "estado": "VERIFICADO",
+  "fecha_creacion": "2026-11-06",
+  "fecha_ultima_verificacion": "2026-11-06",
+  "condiciones_revalidacion": "Revisar si el ambiente de Pruebas llega a tener alguna vez un area real con 2+ sucursales (ya no haria falta el insert temporal).",
+  "reemplaza": null,
+  "reemplazada_por": null,
+  "motivo_invalidacion": null
+}

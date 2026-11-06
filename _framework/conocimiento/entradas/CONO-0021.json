@@ -1,0 +1,18 @@
+{
+  "id": "CONO-0021",
+  "tipo": "DATO_DE_PRUEBA",
+  "descripcion": "La cuenta SCASTI_DW (clave rotativa, ver generate_scripts.py de cada proyecto para la vigente) es reutilizable entre proyectos de Web LDS y va acumulando roles funcionales con el tiempo - probarla primero antes de pedir credenciales nuevas para un modulo nuevo. Cuando a SCASTI_DW le falta un rol especifico, DCABA_DW es la cuenta alternativa usada en varios proyectos (RF-02/03/04/06 de PR000349, por ejemplo).",
+  "modulo": "framework-general",
+  "ambiente": null,
+  "version": null,
+  "fuente": "Memoria de sesion - cuentas de prueba reutilizables",
+  "requerimiento_origen": "PR000349-SP1",
+  "referencias_evidencia": [],
+  "estado": "PROVISIONAL",
+  "fecha_creacion": "2026-11-06",
+  "fecha_ultima_verificacion": null,
+  "condiciones_revalidacion": null,
+  "reemplaza": null,
+  "reemplazada_por": null,
+  "motivo_invalidacion": null
+}

@@ -1,0 +1,18 @@
+{
+  "id": "CONO-0019",
+  "tipo": "DATO_DE_PRUEBA",
+  "descripcion": "Tablas reales de Synergia Reclamos (schema BD): csc_reclamo, csc_rclmo_est_act, csc_rclmo_req_adm, csc_acuerdo, cs_operador, cs_zona, cliente. No se encontro un puente directo sucursal<->zona en estas tablas (se busco explicitamente y no aparecio). Hay un directorio parcial de servicios/controllers reales del backend relevado en esa investigacion.",
+  "modulo": "synergia-reclamos",
+  "ambiente": null,
+  "version": null,
+  "fuente": "Memoria de sesion - investigacion BD Synergia Reclamos",
+  "requerimiento_origen": "PR000326-SP2",
+  "referencias_evidencia": [],
+  "estado": "PROVISIONAL",
+  "fecha_creacion": "2026-11-06",
+  "fecha_ultima_verificacion": null,
+  "condiciones_revalidacion": "Confirmar si aparecio algun puente sucursal-zona en iteraciones posteriores.",
+  "reemplaza": null,
+  "reemplazada_por": null,
+  "motivo_invalidacion": null
+}

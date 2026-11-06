@@ -1,0 +1,18 @@
+{
+  "id": "CONO-0015",
+  "tipo": "REGLA_DOCUMENTADA",
+  "descripcion": "Al automatizar flujos de Ingresar/Eliminar (altas y bajas), el caso debe confirmar la alta/baja REAL de esa misma corrida (releer y verificar el cambio de estado), no solo la presencia/ausencia de un registro en la grilla - de lo contrario un dato viejo de otra corrida puede dar un falso OK sin haber probado nada en esta ejecucion.",
+  "modulo": "framework-general",
+  "ambiente": null,
+  "version": null,
+  "fuente": "Memoria de sesion - convencion establecida tras varios falsos OK",
+  "requerimiento_origen": "PR000325-SP3",
+  "referencias_evidencia": [],
+  "estado": "VERIFICADO",
+  "fecha_creacion": "2026-11-06",
+  "fecha_ultima_verificacion": "2026-11-06",
+  "condiciones_revalidacion": null,
+  "reemplaza": null,
+  "reemplazada_por": null,
+  "motivo_invalidacion": null
+}

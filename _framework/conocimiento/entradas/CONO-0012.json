@@ -1,0 +1,18 @@
+{
+  "id": "CONO-0012",
+  "tipo": "SOLUCION_TECNICA_COMPROBADA",
+  "descripcion": "Overlays/modales de ng-zorro (nz-modal-container, cdk-overlay-*): puede haber mas de un overlay coexistiendo (incluyendo backdrops invisibles) - usar .last o filtrar por has_text en vez de .first, que agarra el overlay equivocado. Si un elemento 'existe' pero no es visible, tomar el screenshot de toda la pagina (app.screenshot()), no del overlay.",
+  "modulo": "framework-general",
+  "ambiente": null,
+  "version": null,
+  "fuente": "Memoria de sesion - gotchas acumulados de automatizacion Web LDS",
+  "requerimiento_origen": "PR000349-SP3",
+  "referencias_evidencia": [],
+  "estado": "VERIFICADO",
+  "fecha_creacion": "2026-11-06",
+  "fecha_ultima_verificacion": "2026-11-06",
+  "condiciones_revalidacion": null,
+  "reemplaza": null,
+  "reemplazada_por": null,
+  "motivo_invalidacion": null
+}
