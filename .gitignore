@@ -31,12 +31,15 @@ MS*/*
 !PR*/*.py
 !PR*/matriz_casos.json
 !PR*/casos_fallidos_confirmados.json
+!PR*/rf_nombres.json
 !IP*/*.py
 !IP*/matriz_casos.json
 !IP*/casos_fallidos_confirmados.json
+!IP*/rf_nombres.json
 !MS*/*.py
 !MS*/matriz_casos.json
 !MS*/casos_fallidos_confirmados.json
+!MS*/rf_nombres.json
 
 # Dentro de _framework y de cada PR*: cache/generados/config local, nunca
 # codigo fuente

@@ -396,7 +396,9 @@ async function cargarReporte(proyecto) {
 function renderizarReporte(datos) {
   const filasResumen = datos.resumen.map((r) => `
     <tr>
-      <td>${r.rf}</td>
+      <td>${_escapeHtml(r.rf)}</td>
+      <td>${_escapeHtml(r.nombre || "")}</td>
+      <td>${_escapeHtml(r.ventana || "")}</td>
       <td class="estado-OK">${r.ok}</td>
       <td class="estado-NOOK">${r.no_ok}</td>
       <td class="estado-FALLIDO">${r.fallido}</td>
@@ -409,6 +411,8 @@ function renderizarReporte(datos) {
   const filaTotal = `
     <tr style="font-weight:bold">
       <td>TOTAL</td>
+      <td></td>
+      <td></td>
       <td class="estado-OK">${t.ok}</td>
       <td class="estado-NOOK">${t.no_ok}</td>
       <td class="estado-FALLIDO">${t.fallido}</td>
@@ -417,12 +421,19 @@ function renderizarReporte(datos) {
       <td>${t.pct_ok !== null ? t.pct_ok + "%" : "-"}</td>
     </tr>`;
 
+  const infoPorRf = {};
+  datos.resumen.forEach((r) => { infoPorRf[r.rf] = r; });
+
   let rfActual = null;
   const filasDetalle = datos.detalle.map((d) => {
     let encabezado = "";
     if (d.rf !== rfActual) {
       rfActual = d.rf;
-      encabezado = `<tr class="rf-header"><td colspan="7">${rfActual}</td></tr>`;
+      const info = infoPorRf[rfActual] || {};
+      const partes = [rfActual];
+      if (info.nombre) partes.push(info.nombre);
+      if (info.ventana) partes.push(`(ventana: ${info.ventana})`);
+      encabezado = `<tr class="rf-header"><td colspan="7">${_escapeHtml(partes.join(" - "))}</td></tr>`;
     }
     const clase = CLASE_ESTADO[d.resultado] || "estado-NOOK";
     return `${encabezado}<tr>
@@ -440,7 +451,7 @@ function renderizarReporte(datos) {
     <p><em>Generado: ${new Date(datos.generado).toLocaleString()}</em></p>
     <h3>Resumen por RF</h3>
     <table class="reporte">
-      <thead><tr><th>RF</th><th>OK</th><th>NO OK</th><th>Fallido</th><th>Sin correr</th><th>Total</th><th>% OK</th></tr></thead>
+      <thead><tr><th>RF</th><th>Nombre</th><th>Ventana</th><th>OK</th><th>NO OK</th><th>Fallido</th><th>Sin correr</th><th>Total</th><th>% OK</th></tr></thead>
       <tbody>${filasResumen}${filaTotal}</tbody>
     </table>
     <h3>Detalle por caso</h3>
