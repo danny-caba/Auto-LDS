@@ -47,6 +47,7 @@ BASE = Path(__file__).resolve().parent
 MATRIZ = json.loads((BASE / "matriz_casos.json").read_text(encoding="utf-8"))
 REPORTES_DIR = BASE / "reportes"
 CASOS_FALLIDOS_PATH = BASE / "casos_fallidos_confirmados.json"
+RF_NOMBRES_PATH = BASE / "rf_nombres.json"
 
 VERDE = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")
 ROJO = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
@@ -69,6 +70,17 @@ def cargar_casos_fallidos_confirmados():
         return {}
     datos = json.loads(CASOS_FALLIDOS_PATH.read_text(encoding="utf-8"))
     return {k: v for k, v in datos.items() if not k.startswith("_")}
+
+
+def cargar_rf_nombres():
+    """RF -> dict(nombre, ventana) con el nombre descriptivo del RF y el
+    titulo real de la ventana/pantalla que implementa (confirmado en
+    vivo durante la automatizacion). Devuelve {} si rf_nombres.json no
+    existe en este proyecto (opcional, no rompe proyectos que no lo
+    tengan)."""
+    if not RF_NOMBRES_PATH.exists():
+        return {}
+    return json.loads(RF_NOMBRES_PATH.read_text(encoding="utf-8"))
 
 
 def _normalizar_resultado(texto, cp, confirmados):
@@ -112,12 +124,13 @@ def recolectar_resultados(confirmados):
     return resultados
 
 
-def construir_datos(resultados, confirmados):
+def construir_datos(resultados, confirmados, rf_nombres=None):
     """Calcula el resumen por RF + detalle por caso a partir de
     `resultados` (ver recolectar_resultados()) y `confirmados` (ver
     cargar_casos_fallidos_confirmados()), en un dict plano JSON-friendly
     que tanto construir_workbook() como el webapp (server.py) consumen
     sin recalcular nada por su cuenta."""
+    rf_nombres = rf_nombres or {}
     conteos = {}
     for cp, v in MATRIZ.items():
         rf = v["rf"]
@@ -132,8 +145,10 @@ def construir_datos(resultados, confirmados):
         c = conteos[rf]
         n_total = sum(c.values())
         pct = round(c["OK"] / n_total * 100) if n_total else None
+        info_rf = rf_nombres.get(rf, {})
         resumen.append({
-            "rf": rf, "ok": c["OK"], "no_ok": c["NO OK"] + c["OTRO"],
+            "rf": rf, "nombre": info_rf.get("nombre", ""), "ventana": info_rf.get("ventana", ""),
+            "ok": c["OK"], "no_ok": c["NO OK"] + c["OTRO"],
             "fallido": c["FALLIDO"], "sin_correr": c["SIN CORRER"],
             "total": n_total, "pct_ok": pct,
         })
@@ -173,23 +188,26 @@ def construir_workbook(datos):
     resumen["A1"].font = Font(bold=True, size=14)
     resumen.append([f"Generado: {datetime.now().strftime('%d/%m/%Y %H:%M')}"])
     resumen.append([])
-    resumen.append(["RF", "OK", "NO OK", "Fallido", "Sin correr", "Total", "% OK"])
+    resumen.append(["RF", "Nombre", "Ventana", "OK", "NO OK", "Fallido", "Sin correr", "Total", "% OK"])
     for c in resumen[4]:
         c.font = FUENTE_HEADER
         c.fill = AZUL_HEADER
 
     for fila_rf in datos["resumen"]:
         pct = f"{fila_rf['pct_ok']}%" if fila_rf["pct_ok"] is not None else "-"
-        resumen.append([fila_rf["rf"], fila_rf["ok"], fila_rf["no_ok"], fila_rf["fallido"], fila_rf["sin_correr"], fila_rf["total"], pct])
+        resumen.append([
+            fila_rf["rf"], fila_rf.get("nombre", ""), fila_rf.get("ventana", ""),
+            fila_rf["ok"], fila_rf["no_ok"], fila_rf["fallido"], fila_rf["sin_correr"], fila_rf["total"], pct,
+        ])
 
     t = datos["total"]
     pct_general = f"{t['pct_ok']}%" if t["pct_ok"] is not None else "-"
-    resumen.append(["TOTAL", t["ok"], t["no_ok"], t["fallido"], t["sin_correr"], t["total"], pct_general])
+    resumen.append(["TOTAL", "", "", t["ok"], t["no_ok"], t["fallido"], t["sin_correr"], t["total"], pct_general])
     for c in resumen[resumen.max_row]:
         c.font = Font(bold=True)
         c.fill = GRIS_RF
 
-    for i, a in enumerate([10, 8, 8, 10, 12, 8, 8], start=1):
+    for i, a in enumerate([10, 42, 32, 8, 8, 10, 12, 8, 8], start=1):
         resumen.column_dimensions[get_column_letter(i)].width = a
 
     detalle = wb.create_sheet("Detalle por caso")
@@ -198,13 +216,20 @@ def construir_workbook(datos):
         c.font = FUENTE_HEADER
         c.fill = AZUL_HEADER
 
+    info_por_rf = {f["rf"]: f for f in datos["resumen"]}
     fila = 2
     rf_actual = None
     fill_por_estado = {"OK": VERDE, "FALLIDO": ROJO, "NO OK": AMARILLO, "SIN CORRER": GRIS_CLARO}
     for d in datos["detalle"]:
         if d["rf"] != rf_actual:
             rf_actual = d["rf"]
-            detalle.append([rf_actual, "", "", "", "", "", "", ""])
+            info = info_por_rf.get(rf_actual, {})
+            partes = [rf_actual]
+            if info.get("nombre"):
+                partes.append(info["nombre"])
+            if info.get("ventana"):
+                partes.append(f"(ventana: {info['ventana']})")
+            detalle.append([" - ".join(partes), "", "", "", "", "", "", ""])
             detalle.merge_cells(start_row=fila, start_column=1, end_row=fila, end_column=8)
             for c in detalle[fila]:
                 c.fill = GRIS_RF
@@ -230,8 +255,9 @@ def construir_workbook(datos):
 
 def main():
     confirmados = cargar_casos_fallidos_confirmados()
+    rf_nombres = cargar_rf_nombres()
     resultados = recolectar_resultados(confirmados)
-    datos = construir_datos(resultados, confirmados)
+    datos = construir_datos(resultados, confirmados, rf_nombres)
     wb = construir_workbook(datos)
 
     REPORTES_DIR.mkdir(exist_ok=True)

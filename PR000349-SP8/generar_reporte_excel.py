@@ -129,9 +129,7 @@ def construir_datos(resultados, confirmados, rf_nombres=None):
     `resultados` (ver recolectar_resultados()) y `confirmados` (ver
     cargar_casos_fallidos_confirmados()), en un dict plano JSON-friendly
     que tanto construir_workbook() como el webapp (server.py) consumen
-    sin recalcular nada por su cuenta. `rf_nombres` (ver
-    cargar_rf_nombres(), opcional) agrega nombre/ventana descriptivos a
-    cada fila de resumen - si no hay entrada para un RF, quedan en ""."""
+    sin recalcular nada por su cuenta."""
     rf_nombres = rf_nombres or {}
     conteos = {}
     for cp, v in MATRIZ.items():
@@ -172,7 +170,7 @@ def construir_datos(resultados, confirmados, rf_nombres=None):
         ts_legible = f"{ts[:4]}-{ts[4:6]}-{ts[6:8]} {ts[9:11]}:{ts[11:13]}" if len(ts) >= 13 else ""
         motivo = confirmados.get(cp, {}).get("motivo", "") if estado == "FALLIDO" else ""
         detalle.append({
-            "cp": cp, "rf": v["rf"], "cu": v["cu"], "nombre": v["name"],
+            "cp": cp, "rf": v["rf"], "cu": v.get("cu", "-"), "nombre": v["name"],
             "resultado": estado, "ultima_corrida": ts_legible,
             "detalle": detalle_txt, "motivo_confirmado": motivo,
         })
@@ -197,7 +195,10 @@ def construir_workbook(datos):
 
     for fila_rf in datos["resumen"]:
         pct = f"{fila_rf['pct_ok']}%" if fila_rf["pct_ok"] is not None else "-"
-        resumen.append([fila_rf["rf"], fila_rf.get("nombre", ""), fila_rf.get("ventana", ""), fila_rf["ok"], fila_rf["no_ok"], fila_rf["fallido"], fila_rf["sin_correr"], fila_rf["total"], pct])
+        resumen.append([
+            fila_rf["rf"], fila_rf.get("nombre", ""), fila_rf.get("ventana", ""),
+            fila_rf["ok"], fila_rf["no_ok"], fila_rf["fallido"], fila_rf["sin_correr"], fila_rf["total"], pct,
+        ])
 
     t = datos["total"]
     pct_general = f"{t['pct_ok']}%" if t["pct_ok"] is not None else "-"
