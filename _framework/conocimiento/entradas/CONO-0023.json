@@ -1,0 +1,21 @@
+{
+  "id": "CONO-0023",
+  "tipo": "DUDA_PENDIENTE",
+  "descripcion": "RF-01 (Antiguedad de Saldo, rol MODANTI) y RF-05 (Asignacion de Clientes Reincorporados, rol LUZRETIC) de PR000349-SP10 NO aparecen en el menu 'Aplicaciones' de NINGUNA de las 2 cuentas de prueba conocidas (DCABA_DW/Melquisedec_01: 422 enlaces de menu visibles, ninguno con 'Saldo'/'Antiguedad' ni 'Reincorp'; SCASTI_DW/Melquisedec_01: 299 enlaces, mismo resultado) - probado en vivo 13/11/2026. Las otras 7 pantallas del mismo sprint SI aparecen con estas mismas 2 cuentas, asi que no es un problema generico de cuenta/ambiente: apunta a que falta el rol especifico (MODANTI o LUZRETIC) en ambas cuentas, o a que el recurso de esas 2 pantallas puntuales todavia no esta dado de alta en Pruebas. Pendiente: pedir al usuario que confirme/asigne el rol faltante, o conseguir una tercera cuenta con MODANTI/LUZRETIC, antes de poder explorar/automatizar RF-01 y RF-05 (36 casos: 18+18... en realidad RF-01=18 CP, RF-05=14 CP, total 32 CP bloqueados hasta resolver esto).",
+  "modulo": "modificacion-gestioncliente",
+  "ambiente": null,
+  "version": null,
+  "fuente": "Exploracion en vivo 13/11/2026 (_exploracion/explore_01_menu.py y explore_02_scasti.py)",
+  "requerimiento_origen": "PR000349-SP10",
+  "referencias_evidencia": [
+    "PR000349-SP10/_exploracion/menu_dump.txt",
+    "PR000349-SP10/_exploracion/menu_dump_scasti.txt"
+  ],
+  "estado": "INVALIDADO",
+  "fecha_creacion": "2026-11-13",
+  "fecha_ultima_verificacion": null,
+  "condiciones_revalidacion": null,
+  "reemplaza": null,
+  "reemplazada_por": null,
+  "motivo_invalidacion": "RESUELTO 13/11/2026: el usuario corrigio la configuracion de roles (MODANTI/LUZRETIC) y ambas pantallas ya aparecen y abren sin Acceso Denegado con DCABA_DW - ver CONO-0025."
+}

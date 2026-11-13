@@ -1013,31 +1013,38 @@ def main():
         try:
             login(page, paso_excel=1)
             app, frame = abrir_adsoltra(page, paso_excel=1)
-            buscar_y_seleccionar_orden(app, frame, "4128447")
+            buscar_y_seleccionar_orden(app, frame, "500007")
             frame.locator("button", has_text="Consultar/Modificar").first.click()
             app.wait_for_timeout(2500)
             extractor = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile("Extractor")).last
             assert extractor.count() and extractor.first.is_visible(), "No se abrio el Extractor de la orden de prueba"
-            capturar_paso(app, "extractor_no_finalizado", paso_excel=1)
+            nombre_archivo_adjunto = extractor.first.locator("#extAdjunto").input_value()
+            print(f"ARCHIVO ADJUNTO ANTES DE FINALIZAR: {nombre_archivo_adjunto!r}")
+            capturar_paso(app, f"extractor_no_finalizado_archivo_{nombre_archivo_adjunto}", paso_excel=1)
 
             mensaje_resultado = None
-            for _intento in range(3):
+            for _intento in range(6):
                 extractor.first.locator("button", has_text="Finalizar").click(force=True)
-                app.wait_for_timeout(1500)
+                app.wait_for_timeout(2500)
                 error_servicio = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile("Error de Servicio"))
                 if error_servicio.count() and error_servicio.last.is_visible():
                     error_servicio.last.get_by_role("button", name=re.compile("Cancelar", re.I)).click(force=True)
-                    app.wait_for_timeout(1200)
+                    app.wait_for_timeout(2000)
                     continue
                 confirmacion = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile("Confirmación EXTRAC"))
-                assert confirmacion.count() and confirmacion.last.is_visible(), "No se vio la confirmacion esperada antes de finalizar"
+                for _ in range(6):
+                    if confirmacion.count() and confirmacion.last.is_visible():
+                        break
+                    app.wait_for_timeout(500)
+                if not (confirmacion.count() and confirmacion.last.is_visible()):
+                    continue
                 capturar_paso(app, "confirmacion_antes_de_finalizar", paso_excel=2)
                 confirmacion.last.get_by_role("button", name=re.compile("^Aceptar$", re.I)).click(force=True)
                 app.wait_for_timeout(2500)
                 dlg_resultado = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile("Ventana de Validación|Error de Servicio"))
                 if dlg_resultado.count() and "Error de Servicio" in dlg_resultado.first.inner_text():
                     dlg_resultado.first.get_by_role("button", name=re.compile("Cancelar", re.I)).click(force=True)
-                    app.wait_for_timeout(1200)
+                    app.wait_for_timeout(2000)
                     continue
                 assert dlg_resultado.count() and dlg_resultado.first.is_visible(), "No se vio el mensaje de resultado de la finalizacion"
                 mensaje_resultado = dlg_resultado.first.inner_text()
@@ -1046,12 +1053,14 @@ def main():
                 app.wait_for_timeout(1500)
                 break
             assert mensaje_resultado is not None, "No se pudo completar la finalizacion tras varios intentos (Error de Servicio persistente)"
-            assert "La Orden 4128447 ha sido finalizado correctamente" in mensaje_resultado, f"Mensaje de confirmacion inesperado: {mensaje_resultado!r}"
+            assert "La Orden 500007 ha sido finalizado correctamente" in mensaje_resultado, f"Mensaje de confirmacion inesperado: {mensaje_resultado!r}"
 
-            # DEFECTO REAL confirmado en vivo 07/11/2026 (ver casos_fallidos_confirmados.json,
-            # 2/2 ordenes reales distintas fallan igual): el sistema deberia retirar el
+            # DEFECTO REAL confirmado en vivo (ver casos_fallidos_confirmados.json,
+            # 3/3 ordenes reales distintas fallan igual): el sistema deberia retirar el
             # adjunto del repositorio al finalizar, pero siempre informa que no pudo.
-            assert "no pudo retirarse del repositorio" not in mensaje_resultado, f"Defecto real: el sistema deberia retirar el adjunto del repositorio al finalizar, pero informo: {mensaje_resultado!r}"
+            # El nombre del archivo (nombre_archivo_adjunto, impreso antes de Finalizar)
+            # confirma que SI habia un archivo real registrado para esta orden.
+            assert "no pudo retirarse del repositorio" not in mensaje_resultado, f"Defecto real: el sistema deberia retirar el adjunto del repositorio al finalizar (archivo {nombre_archivo_adjunto!r}), pero informo: {mensaje_resultado!r}"
 
             capturar_paso(app, "estado_final_del_caso", paso_excel=max(_parsear_pasos_excel(PASOS_CASO), default=None))
             _CASO_OK = True

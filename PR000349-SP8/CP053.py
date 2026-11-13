@@ -1012,7 +1012,91 @@ def main():
         _CASO_OK = False
         try:
             login(page, paso_excel=1)
-            raise NotImplementedError('CP053 (RF-06 - Finalización de la solicitud): falta escribir el body real - falta exploracion en vivo o dato real.')
+            app, frame = abrir_adsoltra(page, paso_excel=1)
+
+            # Escenario A: orden real 3365695 (RQ, rol_actual=DACD via UPDATE) -
+            # finalizar de verdad (Aceptar). Mismo gotcha del .seg-overlay que
+            # CP052: click de Finalizar via evaluate(), no via Playwright click normal.
+            buscar_y_seleccionar_orden(app, frame, "3365695", tipo_orden="SEGEN = Solicitudes Especiales")
+            frame.locator("button", has_text=re.compile("Consultar|Modificar")).first.click(force=True)
+            app.wait_for_timeout(3000)
+            modal_a = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile("Solicitud Especial")).last
+            boton_finalizar_a = modal_a.get_by_role("button", name=re.compile("^Finalizar$", re.I))
+            for _ in range(15):
+                if boton_finalizar_a.count() and boton_finalizar_a.first.is_enabled():
+                    break
+                app.wait_for_timeout(500)
+            assert boton_finalizar_a.count() and boton_finalizar_a.first.is_enabled(), "Finalizar deberia estar habilitado en modo modificacion"
+
+            # Reintento sobre el flujo completo Finalizar->confirmacion->Aceptar:
+            # gotcha ya conocido (ver CP042/043) de 'Error de Servicio: Error al
+            # consultar las ordenes de la bandeja' intermitente - confirmado en
+            # vivo 10/11/2026 que tambien aparece en el refresco posterior a
+            # finalizar un SEGEN, no solo en el de un EXTRAC.
+            mensaje_a = None
+            for _intento in range(6):
+                modal_a.get_by_role("button", name=re.compile("^Finalizar$", re.I)).evaluate("el => el.click()")
+                app.wait_for_timeout(2000)
+                error_servicio_a = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile("Error de Servicio"))
+                if error_servicio_a.count() and error_servicio_a.last.is_visible():
+                    error_servicio_a.last.get_by_role("button", name=re.compile("Cancelar", re.I)).click(force=True)
+                    app.wait_for_timeout(2000)
+                    continue
+                confirmacion_a = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile("Confirmaci.n SEGEN"))
+                assert confirmacion_a.count() and confirmacion_a.last.is_visible(), "No aparecio la confirmacion de Finalizar (Confirmacion SEGEN)"
+                texto_confirmacion_a = confirmacion_a.last.inner_text()
+                assert "Confirmaci" in texto_confirmacion_a and "SEGEN" in texto_confirmacion_a, f"Titulo de confirmacion inesperado: {texto_confirmacion_a!r}"
+                assert "Est" in texto_confirmacion_a and "seguro que desea finalizar el SEGEN" in texto_confirmacion_a, f"Texto de confirmacion inesperado: {texto_confirmacion_a!r}"
+                capturar_paso(app, "confirmacion_finalizar_3365695", paso_excel=3)
+
+                confirmacion_a.last.get_by_role("button", name=re.compile("^Aceptar$", re.I)).click(force=True)
+                app.wait_for_timeout(3000)
+                dlg_resultado_a = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile("Ventana de Validación|Error de Servicio"))
+                if dlg_resultado_a.count() and "Error de Servicio" in dlg_resultado_a.first.inner_text():
+                    dlg_resultado_a.first.get_by_role("button", name=re.compile("Cancelar", re.I)).click(force=True)
+                    app.wait_for_timeout(2000)
+                    continue
+                assert dlg_resultado_a.count() and dlg_resultado_a.first.is_visible(), "No se vio el mensaje de resultado de la finalizacion"
+                mensaje_a = dlg_resultado_a.first.inner_text()
+                assert "3365695" in mensaje_a and "ha sido finalizado correctamente" in mensaje_a, f"Mensaje de finalizacion inesperado: {mensaje_a!r}"
+                dlg_resultado_a.first.get_by_role("button", name=re.compile("Aceptar", re.I)).click(force=True)
+                app.wait_for_timeout(1500)
+                break
+            assert mensaje_a is not None, "No se pudo completar la finalizacion tras varios intentos (Error de Servicio persistente)"
+            capturar_paso(app, "orden_3365695_finalizada", paso_excel=4)
+
+            # Verificacion de bandeja refrescada SIN volver a abrir el modal de
+            # Busqueda (gotcha real confirmado en vivo 10/11/2026: justo despues de
+            # cerrar los dialogos de Error de Servicio/confirmacion puede quedar un
+            # tooltip-popover residual (.cdk-overlay-popover) que intercepta el
+            # siguiente click en 'Buscar' - el texto de la grilla ya esta
+            # refrescado automaticamente, no hace falta buscar de nuevo).
+            texto_bandeja_a = frame.locator("body").inner_text()
+            assert "3365695" in texto_bandeja_a and "Finalizacion" in texto_bandeja_a, f"La orden deberia quedar en estado Finalizacion en la bandeja ya refrescada: {texto_bandeja_a[-300:]!r}"
+            capturar_paso(app, "orden_3365695_en_bandeja_finalizada", paso_excel=4)
+
+            # Escenario B: orden real 43796 (DV, rol_actual=DACD via UPDATE) -
+            # cancelar la finalizacion, debe conservar su estado anterior (Devolucion)
+            buscar_y_seleccionar_orden(app, frame, "43796", tipo_orden="SEGEN = Solicitudes Especiales")
+            frame.locator("button", has_text=re.compile("Consultar|Modificar")).first.click(force=True)
+            app.wait_for_timeout(3000)
+            modal_b = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile("Solicitud Especial")).last
+            modal_b.get_by_role("button", name=re.compile("^Finalizar$", re.I)).evaluate("el => el.click()")
+            app.wait_for_timeout(2000)
+            confirmacion_b = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile("Confirmaci.n SEGEN"))
+            assert confirmacion_b.count() and confirmacion_b.last.is_visible(), "No aparecio la confirmacion de Finalizar para la orden 43796"
+            capturar_paso(app, "confirmacion_finalizar_43796", paso_excel=3)
+            confirmacion_b.last.get_by_role("button", name=re.compile("^Cancelar$", re.I)).click(force=True)
+            app.wait_for_timeout(1500)
+
+            assert modal_b.get_by_role("button", name=re.compile("^Enviar$", re.I)).first.is_enabled(), "Tras cancelar la finalizacion deberia seguir en modo modificacion (Enviar habilitado)"
+            capturar_paso(app, "orden_43796_sigue_en_modificacion", paso_excel=5)
+            modal_b.get_by_role("button", name=re.compile("^Cancelar$", re.I)).click(force=True)
+            app.wait_for_timeout(1000)
+
+            texto_bandeja_b = frame.locator("body").inner_text()
+            assert "43796" in texto_bandeja_b and "Devolucion" in texto_bandeja_b, f"La orden 43796 deberia conservar su estado anterior (Devolucion) tras cancelar: {texto_bandeja_b[-300:]!r}"
+            capturar_paso(app, "orden_43796_conserva_estado_devolucion", paso_excel=5)
 
             capturar_paso(app, "estado_final_del_caso", paso_excel=max(_parsear_pasos_excel(PASOS_CASO), default=None))
             _CASO_OK = True

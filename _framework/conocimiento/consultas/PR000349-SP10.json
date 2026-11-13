@@ -1,0 +1,40 @@
+{
+  "requerimiento": "PR000349-SP10",
+  "fecha": "2026-11-13T05:51:49.464433",
+  "entradas_consultadas": [
+    "CONO-0007",
+    "CONO-0010",
+    "CONO-0011",
+    "CONO-0012",
+    "CONO-0013",
+    "CONO-0014",
+    "CONO-0015",
+    "CONO-0016",
+    "CONO-0017",
+    "CONO-0018",
+    "CONO-0019",
+    "CONO-0020",
+    "CONO-0021",
+    "CONO-0001",
+    "CONO-0002"
+  ],
+  "entradas_aplicadas": [
+    "CONO-0010",
+    "CONO-0011",
+    "CONO-0012",
+    "CONO-0013",
+    "CONO-0014",
+    "CONO-0015",
+    "CONO-0016",
+    "CONO-0017",
+    "CONO-0018",
+    "CONO-0021"
+  ],
+  "entradas_descartadas": {
+    "CONO-0007": "Dato de cliente de prueba (RUC/numero 15) es de la pantalla Informacion General (otro aplicativo) - no hay indicio de que sea el mismo cliente util para las 9 pantallas de Gestion de Cliente de SP10; se buscara un cliente de prueba propio por RF.",
+    "CONO-0019": "Tablas de Synergia Reclamos, dominio no relacionado (Cobranza/Reclamos vs Gestion de Cliente).",
+    "CONO-0020": "Hallazgo de Acceso Denegado puntual del modulo MAC (Atencion Integral), no aplica a las pantallas nuevas de SP10.",
+    "CONO-0001": "Pagina de juguete local de la Etapa 4, no es conocimiento de un aplicativo real de Web LDS.",
+    "CONO-0002": "Entrada de prueba del propio mecanismo de invalidacion, no es conocimiento real."
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "id": "CONO-0025",
+  "tipo": "COMPORTAMIENTO_OBSERVADO",
+  "descripcion": "RESUELTO 13/11/2026: tras una correccion de configuracion de roles pedida al usuario, RF-01 (Modificacion De Antiguedad De Saldo, rol MODANTI) y RF-05 (Reincorporacion De Clientes Retirados, rol LUZRETIC) de PR000349-SP10 YA APARECEN en el menu de DCABA_DW y abren sin Acceso Denegado - confirmado en vivo. Reemplaza la duda pendiente CONO-0023 (ya no aplica). Nombres reales de menu distintos a los del EF: 'Modificacion De Antiguedad De Saldo' (EF dice 'Modificacion de Antiguedad de Saldo', coincide) y 'Reincorporacion De Clientes Retirados' (EF la llama 'Asignacion de Clientes Reincorporados' - nombre distinto). Campos RF-01: #numeroCliente, Leer, #nombre, #direccion, #antiguedadSaldo (unico editable, nace disabled), Cerrar, Modificar (nace disabled). Campos RF-05 (unica pantalla del sprint con 2 clientes a la vez): #numeroCliente (reincorporado), Leer, #nombre/#direccion (reincorporado), #numeroClienteRetirado (nace disabled), #nombreRetirado/#direccionRetirado/#saldoActual (editables desde el inicio, raro para datos que deberian ser solo lectura - pendiente confirmar si es bug), Cerrar, Desasociar (nace disabled), Modificar (nace disabled, no 'Asociar' como podria sugerir el EF). Documentado en _framework/modulos/modificacion_antiguedad_saldo.py y reincorporacion_clientes_retirados.py.",
+  "modulo": "modificacion-gestioncliente",
+  "ambiente": null,
+  "version": null,
+  "fuente": "Exploracion en vivo 13/11/2026 (_exploracion/explore_14 a explore_16)",
+  "requerimiento_origen": "PR000349-SP10",
+  "referencias_evidencia": [
+    "_framework/modulos/modificacion_antiguedad_saldo.py",
+    "_framework/modulos/reincorporacion_clientes_retirados.py",
+    "PR000349-SP10/_exploracion/RF-01_AntiguedadSaldo_campos.json",
+    "PR000349-SP10/_exploracion/RF-05_ReincorporacionClientesRetirados_campos.json"
+  ],
+  "estado": "VERIFICADO",
+  "fecha_creacion": "2026-11-13",
+  "fecha_ultima_verificacion": "2026-11-13",
+  "condiciones_revalidacion": null,
+  "reemplaza": null,
+  "reemplazada_por": null,
+  "motivo_invalidacion": null
+}

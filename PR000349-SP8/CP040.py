@@ -1012,7 +1012,38 @@ def main():
         _CASO_OK = False
         try:
             login(page, paso_excel=1)
-            raise NotImplementedError('CP040 (RF-05 - Descarga del adjunto): falta escribir el body real - falta exploracion en vivo o dato real.')
+            app, frame = abrir_adsoltra(page, paso_excel=1)
+            # Orden 500007 vuelta a RQ con UPDATE directo (estaba en Finalizacion
+            # por el run de CP043) para cumplir la precondicion real de CP040 (orden
+            # EXTRAC NO finalizada con adjunto registrado) - no hay ninguna orden
+            # EXTRAC no finalizada nativa en todo el ambiente de Pruebas (ver
+            # casos_fallidos_confirmados.json, 0 EXTRAC en Pendientes/Devueltas/Anuladas).
+            buscar_y_seleccionar_orden(app, frame, "500007")
+            frame.locator("button", has_text="Consultar/Modificar").first.click()
+            app.wait_for_timeout(2500)
+            extractor = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile("Extractor")).last
+            assert extractor.count() and extractor.first.is_visible(), "No se abrio el Extractor de la orden de prueba"
+            capturar_paso(app, "extractor_no_finalizado", paso_excel=2)
+
+            boton_guardar = extractor.first.get_by_role("button", name=re.compile(r"^\s*Guardar\s*$", re.I))
+            assert boton_guardar.count(), "No se encontro el boton Guardar (accion de obtencion del adjunto, paso 3 de la matriz)"
+            try:
+                with app.expect_download(timeout=15000) as descarga_info:
+                    boton_guardar.first.click(force=True)
+                capturar_paso(app, "descarga_confirmada", paso_excel=4)
+                assert False, f"INESPERADO: la descarga SI se completo ({descarga_info.value.suggested_filename}) - revisar si el defecto de CP043 (retiro de adjunto) se corrigio"
+            except PWTimeoutError:
+                mensaje_dialogo = cerrar_dialogo_validacion_si_aparece(app, frame)
+                capturar_paso(app, "guardar_sin_descarga", paso_excel=4)
+                # PENDIENTE DE REPORTAR A DESARROLLO (mismo defecto de fondo que
+                # CP043): el boton Guardar SI es la accion real de descarga (confirmado
+                # en vivo 10/11/2026 con la orden 500007 en estado RQ), pero el backend
+                # no logra servir el archivo - mismo problema sistemico del servicio
+                # de repositorio de adjuntos, visto ahora desde el lado de la descarga.
+                assert mensaje_dialogo is not None and "No existen" not in mensaje_dialogo, f"Se esperaba una descarga exitosa (paso 4-5 de la matriz), pero Guardar no descargo nada: {mensaje_dialogo!r}"
+                assert False, f"El archivo NO se descarga: {mensaje_dialogo!r} - mismo defecto sistemico de repositorio de adjuntos que CP043"
+            extractor.first.locator("button", has_text="Cancelar").click(force=True)
+            app.wait_for_timeout(800)
 
             capturar_paso(app, "estado_final_del_caso", paso_excel=max(_parsear_pasos_excel(PASOS_CASO), default=None))
             _CASO_OK = True

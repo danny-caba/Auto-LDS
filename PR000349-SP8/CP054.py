@@ -1012,7 +1012,57 @@ def main():
         _CASO_OK = False
         try:
             login(page, paso_excel=1)
-            raise NotImplementedError('CP054 (RF-06 - Observaciones previas y observación nueva): falta escribir el body real - falta exploracion en vivo o dato real.')
+            app, frame = abrir_adsoltra(page, paso_excel=1)
+
+            # Orden real 43796 (DV, rol_actual=DACD), ya tiene 3 observaciones
+            # previas reales acumuladas en sus movimientos (confirmado en vivo:
+            # 2 historicas de 2002 + 1 de la prueba de CP052).
+            buscar_y_seleccionar_orden(app, frame, "43796", tipo_orden="SEGEN = Solicitudes Especiales")
+            frame.locator("button", has_text=re.compile("Consultar|Modificar")).first.click(force=True)
+            app.wait_for_timeout(3000)
+            modal = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile("Solicitud Especial")).last
+
+            observaciones_previas = modal.locator("textarea").first
+            assert not observaciones_previas.is_editable(), "Las observaciones previas deberian estar en modo lectura (no editables)"
+            texto_previas = observaciones_previas.input_value()
+            assert texto_previas.count("\n") >= 1, f"Las observaciones previas deberian verse acumuladas (varios movimientos): {texto_previas!r}"
+            capturar_paso(app, "observaciones_previas_acumuladas_solo_lectura", paso_excel=2)
+
+            # Paso 3: Enter no debe incorporar salto de linea en la observacion nueva
+            observacion_nueva = modal.locator("textarea").last
+            observacion_nueva.fill("")
+            observacion_nueva.type("Texto de Prueba 123", delay=30)
+            observacion_nueva.press("Enter")
+            observacion_nueva.type(" - sin salto de linea", delay=30)
+            valor_tras_enter = observacion_nueva.input_value()
+            assert "\n" not in valor_tras_enter, f"Enter no deberia incorporar un salto de linea en la observacion nueva: {valor_tras_enter!r}"
+            capturar_paso(app, "enter_no_agrega_salto_de_linea", paso_excel=3)
+
+            # Paso 4: Enviar con la observacion mezclando mayusculas y minusculas
+            observacion_nueva.fill("Texto de Prueba 123")
+            modal.get_by_role("button", name=re.compile("^Enviar$", re.I)).evaluate("el => el.click()")
+            app.wait_for_timeout(3000)
+            mensaje = cerrar_dialogo_validacion_si_aparece(app, frame, timeout_ms=8000)
+            assert mensaje and "43796" in mensaje and "ha sido enviada" in mensaje, f"Mensaje de confirmacion inesperado: {mensaje!r}"
+            capturar_paso(app, "envio_con_observacion_mixta", paso_excel=4)
+
+            # Paso 5: reabrir y verificar que el movimiento conserva mayus/minus,
+            # sin saltos de linea, dentro de las observaciones acumuladas
+            buscar_y_seleccionar_orden(app, frame, "43796", tipo_orden="SEGEN = Solicitudes Especiales")
+            frame.locator("button", has_text=re.compile("Consultar|Modificar")).first.click(force=True)
+            app.wait_for_timeout(3000)
+            modal2 = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile("Solicitud Especial")).last
+            texto_previas_2 = modal2.locator("textarea").first.input_value()
+            assert "Texto de Prueba 123" in texto_previas_2, f"La observacion deberia conservar mayusculas/minusculas tal como se ingreso (sin convertirse a mayusculas): {texto_previas_2!r}"
+            capturar_paso(app, "movimiento_conserva_mayus_minus", paso_excel=5)
+
+            # Paso 6: repetir el envio dejando la observacion vacia
+            modal2.locator("textarea").last.fill("")
+            modal2.get_by_role("button", name=re.compile("^Enviar$", re.I)).evaluate("el => el.click()")
+            app.wait_for_timeout(3000)
+            mensaje2 = cerrar_dialogo_validacion_si_aparece(app, frame, timeout_ms=8000)
+            assert mensaje2 and "43796" in mensaje2 and "ha sido enviada" in mensaje2, f"Mensaje de confirmacion inesperado (observacion vacia): {mensaje2!r}"
+            capturar_paso(app, "envio_con_observacion_vacia", paso_excel=6)
 
             capturar_paso(app, "estado_final_del_caso", paso_excel=max(_parsear_pasos_excel(PASOS_CASO), default=None))
             _CASO_OK = True

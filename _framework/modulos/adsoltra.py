@@ -172,6 +172,27 @@ def texto_pie_paginador(frame):
     return tuple(int(g) for g in m.groups())
 
 
+def pie_paginador_estable(app, frame, intentos=8, espera_ms=600):
+    """Igual que texto_pie_paginador(), pero espera a que el valor se
+    mantenga igual en 2 lecturas consecutivas antes de devolverlo.
+
+    Gotcha confirmado en vivo 12/11/2026 (RF-02, busquedas SEGEN sin
+    filtro de rol): leer el pie apenas termina el expect_response de
+    ConsultarOrdenes puede capturar la grilla a medio renderizar (mismo
+    patron que el buscador de Usuario Destino en CP060) y dar un total
+    mas bajo que el real, de forma no determinista entre corridas (14,
+    15, 23 leidos en sucesion sobre la MISMA busqueda). Si no se
+    estabiliza en `intentos` lecturas, devuelve la ultima leida."""
+    anterior = texto_pie_paginador(frame)
+    for _ in range(intentos):
+        app.wait_for_timeout(espera_ms)
+        actual = texto_pie_paginador(frame)
+        if actual == anterior and actual is not None:
+            return actual
+        anterior = actual
+    return anterior
+
+
 def seleccionar_fila_por_numero_orden(frame, numero_orden):
     fila = frame.locator("tr", has_text=str(numero_orden))
     fila.first.click()

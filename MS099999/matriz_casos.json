@@ -1,0 +1,22 @@
+{
+  "CP001": {
+    "rf": "RF-01",
+    "cp": "CP001",
+    "name": "Carga automática de datos de cliente en la pantalla \"Información General\"",
+    "desc": "Validar que los campos del cliente visualicen con la información vinculada al número de cliente ingresado.",
+    "precond": "Estar asignado al rol funcional CONSCLIE",
+    "datos": "-",
+    "esperado": "Se visualizará  los datos del cliente organizados por secciones en el módulo de Información General.",
+    "pasos": "1. Ingresar a la plataforma web de Luz del Sur.\n2. Ubicar y seleccionar la aplicación \"Atención Integral\".\n3. Digitar el número de cliente en el campo de búsqueda.\n4. Seleccionar en el menú el módulo \"Información General\".\n5. Verificar la información consultada en la pantalla."
+  },
+  "CP002": {
+    "rf": "RF-01",
+    "cp": "CP002",
+    "name": "Generación de Reporte PDF",
+    "desc": "Validar que se genere el archivo PDF y  que contenga la información vinculada al número de cliente ingresado.",
+    "precond": "Estar asignado al rol funcional CONSCLIE",
+    "datos": "-",
+    "esperado": "Se generará un reporte PDF con la información consultada en la pantalla \"Información General.",
+    "pasos": "1. Ingresar a la plataforma web de Luz del Sur.\n2. Ubicar y seleccionar la aplicación \"Atención Integral\".\n3. Digitar el número de cliente en el campo de búsqueda.\n4. Seleccionar en el menú el módulo \"Información General\".\n5. Verificar la información consultada en la pantalla.\n6. Hacer clic en el botón \"Descargar PDF\" para generar y guardar el reporte."
+  }
+}

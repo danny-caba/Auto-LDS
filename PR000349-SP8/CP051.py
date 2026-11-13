@@ -1012,7 +1012,43 @@ def main():
         _CASO_OK = False
         try:
             login(page, paso_excel=1)
-            raise NotImplementedError('CP051 (RF-06 - Modo consulta de una solicitud): falta escribir el body real - falta exploracion en vivo o dato real.')
+            app, frame = abrir_adsoltra(page, paso_excel=1)
+
+            # Escenario A: orden real 3365694 (rol_actual=EXPLRECAU, distinto del
+            # rol de la sesion DACD) -> modo consulta
+            buscar_y_seleccionar_orden(app, frame, "3365694", tipo_orden="SEGEN = Solicitudes Especiales")
+            frame.locator("button", has_text=re.compile("Consultar|Modificar")).first.click(force=True)
+            app.wait_for_timeout(3000)
+            modal = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile("Solicitud Especial")).last
+
+            for campo in ["segNumeroCliente", "segTipoOrden", "segTema", "segTrabajo", "segClase", "segUsuarioDestino"]:
+                assert not modal.locator(f"#{campo}").is_enabled(), f"El panel {campo} deberia estar deshabilitado en modo consulta"
+            assert not modal.get_by_role("button", name=re.compile("^Enviar$", re.I)).first.is_enabled(), "Enviar deberia estar deshabilitado en modo consulta"
+            assert not modal.get_by_role("button", name=re.compile("^Finalizar$", re.I)).first.is_enabled(), "Finalizar deberia estar deshabilitado en modo consulta"
+            pdf_btn = modal.get_by_role("button", name=re.compile("Descargar PDF", re.I))
+            for _ in range(15):
+                if pdf_btn.count() and pdf_btn.first.is_enabled():
+                    break
+                app.wait_for_timeout(500)
+            assert pdf_btn.count() and pdf_btn.first.is_enabled(), "Descargar PDF deberia estar habilitado en modo consulta"
+            capturar_paso(app, "escenario_a_modo_lectura", paso_excel=3)
+
+            modal.get_by_role("button", name=re.compile("Cancelar", re.I)).click(force=True)
+            app.wait_for_timeout(1000)
+            assert frame.locator("button", has_text="Buscar").count() > 0, "No se volvio a la bandeja tras cerrar el modal"
+            capturar_paso(app, "vuelta_a_la_bandeja", paso_excel=4)
+
+            # Escenario B: numero de orden inexistente - el sistema informa la
+            # situacion (Ventana de Validacion) y la aplicacion sigue funcionando
+            try:
+                buscar_y_seleccionar_orden(app, frame, "9999998", tipo_orden="SEGEN = Solicitudes Especiales")
+            except PWTimeoutError:
+                pass
+            app.wait_for_timeout(1000)
+            mensaje = cerrar_dialogo_validacion_si_aparece(app, frame)
+            assert mensaje and "No se encontro la orden solicitada" in mensaje, f"Mensaje inesperado para orden inexistente: {mensaje!r}"
+            capturar_paso(app, "escenario_b_orden_inexistente", paso_excel=5)
+            assert frame.locator("button", has_text="Buscar").count() > 0, "La aplicacion deberia seguir en ejecucion tras la orden inexistente"
 
             capturar_paso(app, "estado_final_del_caso", paso_excel=max(_parsear_pasos_excel(PASOS_CASO), default=None))
             _CASO_OK = True

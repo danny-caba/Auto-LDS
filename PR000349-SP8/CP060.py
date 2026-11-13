@@ -1012,7 +1012,46 @@ def main():
         _CASO_OK = False
         try:
             login(page, paso_excel=1)
-            raise NotImplementedError('CP060 (RF-07 - Valor devuelto al llamador): falta escribir el body real - falta exploracion en vivo o dato real.')
+            app, frame = abrir_adsoltra(page, paso_excel=1)
+            overlay = abrir_segen(app, frame)
+
+            # Paso 1-3: buscador de Usuario Destino, rol de 1 caracter ('*', tipo F,
+            # area asignada manualmente para destrabar el caso - ver
+            # casos_fallidos_confirmados.json H002). Se recorre con Sgtes hasta
+            # encontrarlo (no esta garantizado en la primera pagina).
+            buscador_rol = abrir_buscador_usuario_destino(app, frame, overlay)
+            fila_rol = buscador_rol.locator("tr.sm-fila", has_text=re.compile(r"^\*"))
+            for _ in range(60):
+                if fila_rol.count():
+                    break
+                sgtes = buscador_rol.get_by_role("button", name=re.compile("Sgtes", re.I))
+                if not sgtes.is_enabled():
+                    break
+                sgtes.click(force=True)
+                app.wait_for_timeout(700)
+                fila_rol = buscador_rol.locator("tr.sm-fila", has_text=re.compile(r"^\*"))
+            assert fila_rol.count(), "No se encontro el rol '*' en el buscador de Usuario Destino"
+            capturar_paso(app, "rol_1_caracter_encontrado", paso_excel=2)
+            fila_rol.first.locator("td").first.click()
+            buscador_rol.get_by_role("button", name=re.compile("^Seleccionar$", re.I)).click(force=True)
+            app.wait_for_timeout(1000)
+            assert not buscador_rol.first.is_visible(), "El buscador deberia cerrarse tras Seleccionar"
+            valor_rol = overlay.first.locator("#segUsuarioDestino").input_value()
+            assert valor_rol == "0*", f"El rol de 1 caracter deberia normalizarse a dos caracteres ('0*'): {valor_rol!r}"
+            capturar_paso(app, "rol_normalizado_a_dos_caracteres", paso_excel=3)
+
+            # Paso 4: repetir desde el campo Nro. Cliente (segundo boton "...")
+            buscador_cliente = abrir_buscador_dinamico(app, frame, "Consultar Cliente", 1, overlay)
+            fila_cliente = buscador_cliente.locator("tr.sm-fila").first
+            assert fila_cliente.count(), "No se encontraron resultados en el buscador de Cliente"
+            numero_cliente_esperado = fila_cliente.locator("td").first.inner_text().strip()
+            fila_cliente.locator("td").first.click()
+            buscador_cliente.get_by_role("button", name=re.compile("^Seleccionar$", re.I)).click(force=True)
+            app.wait_for_timeout(1000)
+            assert not buscador_cliente.first.is_visible(), "El buscador de Cliente deberia cerrarse tras Seleccionar"
+            valor_cliente = overlay.first.locator("#segNumeroCliente").input_value()
+            assert valor_cliente == numero_cliente_esperado, f"El campo deberia recibir el numero de cliente de la fila seleccionada ({numero_cliente_esperado!r}): {valor_cliente!r}"
+            capturar_paso(app, "numero_cliente_recibido", paso_excel=4)
 
             capturar_paso(app, "estado_final_del_caso", paso_excel=max(_parsear_pasos_excel(PASOS_CASO), default=None))
             _CASO_OK = True

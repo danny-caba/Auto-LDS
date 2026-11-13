@@ -1012,7 +1012,65 @@ def main():
         _CASO_OK = False
         try:
             login(page, paso_excel=1)
-            raise NotImplementedError('CP048 (RF-06 - Combo encadenado de tema, trabajo y formulario): falta escribir el body real - falta exploracion en vivo o dato real.')
+            app, frame = abrir_adsoltra(page, paso_excel=1)
+
+            # Paso 2-5 de la matriz: cadena Tema -> Trabajo (funciona bien, se
+            # confirma primero antes de aislar el defecto real de Trabajo -> Formulario)
+            overlay = abrir_segen(app, frame)
+            opciones_tipo = overlay.first.locator("#segTipoOrden option")
+            for _ in range(20):
+                if opciones_tipo.count() > 1:
+                    break
+                app.wait_for_timeout(300)
+
+            overlay.first.locator("#segTema").select_option(label="020 = Clientes")
+            opciones_trabajo_020 = overlay.first.locator("#segTrabajo option")
+            for _ in range(20):
+                if opciones_trabajo_020.count() > 1:
+                    break
+                app.wait_for_timeout(300)
+            codigos_020 = [opciones_trabajo_020.nth(i).text_content().strip() for i in range(1, opciones_trabajo_020.count())]
+            assert all(c.startswith("020") for c in codigos_020), f"Los trabajos deberian empezar todos con el codigo del Tema 020: {codigos_020[:5]!r}"
+            capturar_paso(app, "trabajos_recargados_con_tema_020", paso_excel=2)
+
+            overlay.first.locator("#segTema").select_option(label="001 = Nuevos Clientes")
+            opciones_trabajo_001 = overlay.first.locator("#segTrabajo option")
+            for _ in range(20):
+                textos = [opciones_trabajo_001.nth(i).text_content().strip() for i in range(1, opciones_trabajo_001.count())]
+                if textos and all(c.startswith("001") for c in textos):
+                    break
+                app.wait_for_timeout(300)
+            codigos_001 = [opciones_trabajo_001.nth(i).text_content().strip() for i in range(1, opciones_trabajo_001.count())]
+            assert codigos_001 and all(c.startswith("001") for c in codigos_001), f"Al cambiar de Tema, los trabajos deberian recargarse con el codigo del Tema 001: {codigos_001[:5]!r}"
+            capturar_paso(app, "trabajos_recargados_al_cambiar_de_tema", paso_excel=5)
+            overlay.first.locator("button", has_text="Cancelar").click(force=True)
+            app.wait_for_timeout(1000)
+
+            # DEFECTO REAL DE BACKEND confirmado en vivo 10/11/2026: el combo de
+            # Trabajo manda su VALUE completo (tema+trabajo concatenado, ej
+            # "020000") al endpoint ConsultarFormulariosPorTrabajo como si fuera el
+            # codigo de trabajo puro - pero en la tabla real `textord` el campo
+            # `trabajo` guarda solo el sufijo sin el tema (ej "000"), confirmado por
+            # SQL directo (empresa='7', tema='020', trabajo='000' -> 2 filas reales:
+            # idtexto 64 "Verificacion Capacidad empalme" e idtexto 118 "Reclamo
+            # Contratista"; la misma consulta con trabajo='020000' -> 0 filas). El
+            # POST real queda {"tema":"020","trabajo":"020000"} y SIEMPRE responde
+            # [] sin importar el trabajo elegido - el combo de Formulario nunca
+            # puede mostrar nada en ningun par Tema+Trabajo.
+            overlay = abrir_segen(app, frame)
+            overlay.first.locator("#segTema").select_option(label="020 = Clientes")
+            opciones_trabajo = overlay.first.locator("#segTrabajo option")
+            for _ in range(20):
+                if opciones_trabajo.count() > 1:
+                    break
+                app.wait_for_timeout(300)
+            with app.expect_response(lambda r: "ConsultarFormulariosPorTrabajo" in r.url):
+                overlay.first.locator("#segTrabajo").select_option(label="020000")
+            app.wait_for_timeout(1000)
+            opciones_form = overlay.first.locator("#segFormulario option")
+            textos_form = [opciones_form.nth(i).text_content().strip() for i in range(opciones_form.count())]
+            capturar_paso(app, "formulario_vacio_tras_elegir_trabajo", paso_excel=3)
+            assert len(textos_form) > 1, f"DEFECTO REAL: el combo de Formulario deberia mostrar los 2 formularios reales de Tema 020 + Trabajo 000 (idtexto 64 y 118), pero el backend compara 'trabajo' con el codigo completo '020000' en vez del codigo real '000' y siempre devuelve una lista vacia: {textos_form!r}"
 
             capturar_paso(app, "estado_final_del_caso", paso_excel=max(_parsear_pasos_excel(PASOS_CASO), default=None))
             _CASO_OK = True

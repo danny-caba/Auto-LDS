@@ -1,0 +1,32 @@
+{
+  "requerimiento": "PR000349-SP9",
+  "fecha": "2026-11-10T19:54:55.726972",
+  "entradas_consultadas": [
+    "CONO-0010",
+    "CONO-0011",
+    "CONO-0012",
+    "CONO-0013",
+    "CONO-0014",
+    "CONO-0015",
+    "CONO-0016",
+    "CONO-0017",
+    "CONO-0018",
+    "CONO-0021"
+  ],
+  "entradas_aplicadas": [
+    "CONO-0010",
+    "CONO-0012",
+    "CONO-0013",
+    "CONO-0014",
+    "CONO-0015",
+    "CONO-0016",
+    "CONO-0018"
+  ],
+  "entradas_descartadas": {
+    "CONO-0007": "Dato de prueba (cliente Tower and Tower) especifico de la pantalla Informacion General / Atencion Integral, no de modulo Encargos",
+    "CONO-0019": "Tablas de Synergia Reclamos, modulo distinto (no Encargos)",
+    "CONO-0020": "Hallazgo de permisos especifico del modulo MAC, no aplica a Encargos",
+    "CONO-0017": "Gotcha de multi-sucursal (centro_servicio con 2+ sucursales) - puede llegar a aplicar si algun RF de Encargos usa selector de sucursal, pero no se confirmo todavia en la exploracion inicial",
+    "CONO-0021": "Cuenta SCASTI_DW reutilizable - se evalua si hace falta un rol funcional especifico de Encargos antes de decidir si reutilizar o pedir uno nuevo"
+  }
+}

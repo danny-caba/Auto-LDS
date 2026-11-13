@@ -1012,7 +1012,57 @@ def main():
         _CASO_OK = False
         try:
             login(page, paso_excel=1)
-            raise NotImplementedError('CP047 (RF-06 - Cliente obligatorio según el tipo de orden): falta escribir el body real - falta exploracion en vivo o dato real.')
+            app, frame = abrir_adsoltra(page, paso_excel=1)
+
+            # Escenario A: Tipo de Orden AC, Nro. Cliente vacio
+            overlay = abrir_segen(app, frame)
+            opciones_tipo = overlay.first.locator("#segTipoOrden option")
+            for _ in range(20):
+                if opciones_tipo.count() > 1:
+                    break
+                app.wait_for_timeout(300)
+            overlay.first.locator("#segTipoOrden").select_option(label="AC = ATENCION COMERCIAL")
+            app.wait_for_timeout(500)
+            overlay.first.locator("#segUsuarioDestino").fill("EPSG")
+            overlay.first.locator("textarea").last.fill("CP047 escenario A - cliente vacio con tipo AC")
+            overlay.first.locator("button", has_text="Enviar").click(force=True)
+            app.wait_for_timeout(2000)
+            mensaje_a = cerrar_dialogo_validacion_si_aparece(app, frame)
+            assert mensaje_a and "Debe Ingresar el Numero del Cliente" in mensaje_a, f"Mensaje inesperado en escenario A: {mensaje_a!r}"
+            capturar_paso(app, "escenario_a_cliente_obligatorio_AC", paso_excel=3)
+            overlay.first.locator("button", has_text="Cancelar").click(force=True)
+            app.wait_for_timeout(1000)
+
+            # Escenario B: Tipo de Orden distinto de AC (SR), Nro. Cliente vacio -
+            # la matriz espera que el cliente NO se exija y la solicitud se envie
+            # con los demas datos validos. Mismo combo valido usado en CP044 (SR,
+            # Tema 020, primer Trabajo/Formulario, primera Clase, EPSG) - esto
+            # deberia topar con el defecto REAL YA CONFIRMADO en CP044
+            # (RegistrarOrdenSegen HTTP 500, INSERT mal formado), no con un mensaje
+            # de cliente obligatorio.
+            overlay = abrir_segen(app, frame)
+            overlay.first.locator("#segTipoOrden").select_option(label="SR = SOLICITUD DE SERVICIO EN RUTINA")
+            app.wait_for_timeout(500)
+            overlay.first.locator("#segTema").select_option(label="020 = Clientes")
+            app.wait_for_timeout(800)
+            overlay.first.locator("#segTrabajo").select_option(index=1)
+            app.wait_for_timeout(800)
+            opciones_form = overlay.first.locator("#segFormulario option")
+            if opciones_form.count() > 1:
+                overlay.first.locator("#segFormulario").select_option(index=1)
+            overlay.first.locator("#segClase").select_option(index=1)
+            app.wait_for_timeout(500)
+            overlay.first.locator("#segUsuarioDestino").fill("EPSG")
+            overlay.first.locator("textarea").last.fill("CP047 escenario B - cliente vacio con tipo distinto de AC")
+            overlay.first.locator("button", has_text="Enviar").click(force=True)
+            app.wait_for_timeout(3000)
+            dlg_error = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile("Error de Servicio"))
+            dlg_resultado = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile("Ventana de Validación"))
+            mensaje_b = dlg_resultado.first.inner_text() if dlg_resultado.count() and dlg_resultado.first.is_visible() else None
+            assert not (dlg_error.count() and dlg_error.last.is_visible()), f"Defecto real (mismo que CP044): RegistrarOrdenSegen devuelve Error de Servicio en vez de confirmar el envio sin cliente: {dlg_error.last.inner_text() if dlg_error.count() else None!r}"
+            assert mensaje_b is not None and "Debe Ingresar el Numero del Cliente" not in mensaje_b, f"No deberia exigirse el cliente con tipo de orden distinto de AC: {mensaje_b!r}"
+            assert "ha sido enviada" in mensaje_b, f"Bloqueado por el mismo defecto real de CP044 (RegistrarOrdenSegen): {mensaje_b!r}"
+            capturar_paso(app, "escenario_b_cliente_no_exigido", paso_excel=5)
 
             capturar_paso(app, "estado_final_del_caso", paso_excel=max(_parsear_pasos_excel(PASOS_CASO), default=None))
             _CASO_OK = True

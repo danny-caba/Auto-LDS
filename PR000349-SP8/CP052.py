@@ -1012,7 +1012,79 @@ def main():
         _CASO_OK = False
         try:
             login(page, paso_excel=1)
-            raise NotImplementedError('CP052 (RF-06 - Modo modificación y envío): falta escribir el body real - falta exploracion en vivo o dato real.')
+            app, frame = abrir_adsoltra(page, paso_excel=1)
+
+
+            def _modificar_y_enviar(numero_orden, texto_observacion, paso_excel_base):
+                buscar_y_seleccionar_orden(app, frame, numero_orden, tipo_orden="SEGEN = Solicitudes Especiales")
+                frame.locator("button", has_text=re.compile("Consultar|Modificar")).first.click(force=True)
+                app.wait_for_timeout(3000)
+                modal = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile("Solicitud Especial")).last
+                assert modal.locator("#segUsuarioDestino").is_editable(), f"Usuario Destino deberia ser editable en modo modificacion (orden {numero_orden})"
+                assert modal.locator("textarea").last.is_editable(), f"La observacion deberia ser editable en modo modificacion (orden {numero_orden})"
+                assert modal.get_by_role("button", name=re.compile("^Enviar$", re.I)).first.is_enabled(), f"Enviar deberia estar habilitado en modo modificacion (orden {numero_orden})"
+                assert modal.get_by_role("button", name=re.compile("^Finalizar$", re.I)).first.is_enabled(), f"Finalizar deberia estar habilitado en modo modificacion (orden {numero_orden})"
+                capturar_paso(app, f"orden_{numero_orden}_modo_modificacion", paso_excel=paso_excel_base)
+
+                buscador = abrir_buscador_usuario_destino(app, frame, modal)
+                fila = buscador.locator("tr.sm-fila", has_text="EPSG")
+                for _ in range(6):
+                    if fila.count():
+                        break
+                    sgtes = buscador.get_by_role("button", name=re.compile("Sgtes", re.I))
+                    if sgtes.count() and sgtes.is_enabled():
+                        sgtes.click(force=True)
+                        app.wait_for_timeout(1200)
+                        fila = buscador.locator("tr.sm-fila", has_text="EPSG")
+                    else:
+                        break
+                if fila.count():
+                    fila.first.click(force=True)
+                    buscador.get_by_role("button", name=re.compile("^Seleccionar$", re.I)).click(force=True)
+                    app.wait_for_timeout(1000)
+                else:
+                    buscador.get_by_role("button", name=re.compile("^Cancelar$", re.I)).click(force=True)
+                    app.wait_for_timeout(800)
+                    modal.locator("#segUsuarioDestino").fill("EPSG")
+                capturar_paso(app, f"orden_{numero_orden}_usuario_destino_alternativo", paso_excel=paso_excel_base + 1)
+
+                # Gotcha real confirmado en vivo 10/11/2026: cualquier accion que le
+                # quite el foco al textarea de observacion ANTES de clickear Enviar
+                # (un .press("Tab") explicito, o incluso un capturar_paso() de por
+                # medio - su screenshot es full_page=True y ese scroll tambien hace
+                # blur) dispara una validacion en segundo plano que deja un overlay
+                # de carga (.seg-overlay) tapando el boton Enviar de forma
+                # persistente en este contexto (headless + slowmo). Por eso el
+                # fill() y el click a Enviar van seguidos, SIN ningun paso intermedio.
+                # Gotcha real confirmado en vivo 10/11/2026: un div .seg-overlay
+                # (loading propio del formulario SEGEN) queda tapando el boton
+                # Enviar en este flujo de MODIFICAR (no en el de CREAR) - un
+                # click(force=True) de Playwright sigue despachando el evento en
+                # las coordenadas del boton, pero el navegador se lo entrega al
+                # elemento que esta FISICAMENTE encima en ese pixel (el overlay),
+                # asi que nunca llega ningun request al backend (confirmado: 0
+                # respuestas de red capturadas tras el click). Fix: invocar
+                # el.click() directo via evaluate(), que llama al handler de
+                # Angular sin pasar por el hit-testing visual del navegador.
+                modal.locator("textarea").last.fill(texto_observacion)
+                modal.get_by_role("button", name=re.compile("^Enviar$", re.I)).evaluate("el => el.click()")
+                app.wait_for_timeout(3000)
+                mensaje = cerrar_dialogo_validacion_si_aparece(app, frame, timeout_ms=8000)
+                assert mensaje and f"La Orden Numero: {numero_orden} ha sido enviada." in mensaje, f"Mensaje de confirmacion inesperado para la orden {numero_orden}: {mensaje!r}"
+                capturar_paso(app, f"orden_{numero_orden}_enviada", paso_excel=paso_excel_base + 2)
+
+
+            # Escenario A: orden real 3365695 en estado Requerimiento (RQ), rol_actual=DACD via UPDATE directo
+            _modificar_y_enviar("3365695", "PRUEBA SEGEN CP052 - escenario A (Requerimiento)", paso_excel_base=2)
+
+            # Escenario B (repeticion, paso 6 de la matriz): orden real 43796 en
+            # estado Devolucion (DV), con rol receptor=DACD de forma nativa (sin
+            # necesitar UPDATE). NOTA: no se encontro ninguna orden real en estado
+            # Ejecucion (EJ) en el ambiente de Pruebas para repetir ese 3er
+            # escenario - la unica forma de confirmarlo seria con la consulta
+            # pesada de "Todas las Ordenes" (2.3M filas, intermitente/timeout
+            # confirmado en vivo) o un insert temporal adicional.
+            _modificar_y_enviar("43796", "PRUEBA SEGEN CP052 - escenario B (Devolucion)", paso_excel_base=6)
 
             capturar_paso(app, "estado_final_del_caso", paso_excel=max(_parsear_pasos_excel(PASOS_CASO), default=None))
             _CASO_OK = True

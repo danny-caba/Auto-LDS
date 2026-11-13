@@ -1,0 +1,29 @@
+{
+  "_CP006_invalidado": {
+    "motivo": "INVALIDADO 13/11/2026: el usuario reprodujo manualmente el escenario (cliente 47521/DV1, representante vacio, click real en Imprimir) y confirmo que el sistema SI restringe la operacion - solo que via una Ventana de Validacion al momento del click ('Complete el número de identidad y el nombre del representante que retira la constancia.'), no deshabilitando el boton de antemano. El hallazgo anterior (11/11/2026, 'Imprimir queda habilitado = defecto') se basaba en un assert que solo miraba boton_imprimir.is_enabled() SIN clickear de verdad - nunca se verifico que pasaba al click real. Confirmado en vivo 13/11/2026 con _exploracion/explore_89_cp006_click_real_imprimir.py: el click real con representante vacio NO dispara ninguna descarga y muestra el dialogo de validacion esperado. CP006 vuelve a tratarse como caso normal (no FALLIDO) - generate_scripts.py corregido (clickea Imprimir y valida el dialogo en vez de solo is_enabled()) y CP006.py regenerado + corrido de nuevo: OK real (ver CP006/CP006_evidencia.docx, CP006_video.webm, 13/11/2026).",
+    "fecha_verificacion": "2026-11-13"
+  },
+  "_CP039_resuelto": {
+    "motivo": "RESUELTO 13/11/2026: desarrollo corrigio la URL del recurso de menu MMEXTRAE ('Consulta Y Extraccion De Base Semestral') - confirmado en vivo que LanzarAplicativoDebug y obtener-semestres-contraste ya responden 200 (antes 404 real). CP039 reescrito en generate_scripts.py con la entrada directa real (abrir_consulta_base_semestral_directo) y corrido via run_all.py: OK real. Ver _framework/modulos/encargos_basesemestral.py para la ficha tecnica actualizada.",
+    "fecha_verificacion": "2026-11-13"
+  },
+  "_CP040_resuelto": {
+    "motivo": "RESUELTO 13/11/2026 - mismo fix que CP039 (ver esa entrada). CP040 reescrito (seleccionar_semestre_consulta para cambiar a 2008- S1 y confirmar que el combo/Descripcion reflejan el cambio, sin el aviso de semestre fijado) y corrido via run_all.py: OK real.",
+    "fecha_verificacion": "2026-11-13"
+  },
+  "CP033": {
+    "motivo": "BLOQUEADO (falta insumo, no es un hallazgo de comportamiento) - la precondicion requiere un archivo Excel real de medidores con filas incompletas. Los fixtures que cita la matriz (scripts_qa_specialist/Sprint 9/arnes/video/fixtures/input_rf05_cp033_incompletas.xlsx y su generador) no existen en esta maquina, y el formato de columnas esperado (cliente/medidor/marca segun RN-34 del ET, pero sin layout exacto documentado - el propio ET lo marca como 'Supuesto a ratificar') no esta especificado en ningun documento disponible. Construir un archivo a ciegas arriesga reportar un rechazo de FORMATO como si fuera el comportamiento de negocio esperado (deteccion de filas incompletas). Usuario decidio documentar como bloqueado en vez de adivinar.",
+    "fecha_verificacion": "2026-11-11",
+    "evidencia": "Busqueda de los fixtures referenciados y de la especificacion de columnas en documentos/ET_texto.txt (seccion 4.5, RN-33/RN-34) sin resultado concluyente."
+  },
+  "CP034": {
+    "motivo": "BLOQUEADO - mismo motivo que CP033 (ver ese caso): falta el archivo Excel fixture con el medidor de marca equivalente Osinerg. El catalogo osi_medid_marca_eq SI esta confirmado identico a la matriz (FER->FRT, AB0->OTR, etc., ver _exploracion/explore de este sprint), pero sin el layout de columnas del Excel no se puede construir el archivo de entrada con confianza.",
+    "fecha_verificacion": "2026-11-11",
+    "evidencia": "Catalogo osi_medid_marca_eq confirmado en vivo (dbtecnica); fixture de entrada no disponible."
+  },
+  "CP035": {
+    "motivo": "BLOQUEADO - ESPERANDO DATO DE PRUEBA (13/11/2026: el usuario va a conseguir el query para buscar data real que habilite el caso). Mismo motivo raiz que CP033/CP034 (archivo fixture no disponible), confirmado en vivo con la precondicion YA aplicada (proceso_realizado='S' en mm_ruta_optima_cab, cod_proceso_ruta=00026, semestre 2018-S1): el boton 'Procesar...' esta habilitado sin haber validado ningun archivo en la sesion y SI muestra un dialogo de confirmacion ('Se eliminarán todos los medidores seleccionados del semestre 2018- S1 y se cargará una nueva base. ¿Desea continuar?'), pero al aceptar ese dialogo NO se dispara ninguna llamada al backend (0 responses /api/ capturadas) ni aparece el segundo dialogo especifico de 'ya existe una ruta óptima' que describe la matriz - el flujo real necesita datos de un archivo validado exitosamente (Validar...) antes de que Procesar tenga algo que enviar al servidor. Precondicion de BD revertida limpiamente (proceso_realizado vuelto a 'N', verificado).",
+    "fecha_verificacion": "2026-11-13",
+    "evidencia": "_exploracion/explore_78_cp035_procesar.py, _exploracion/explore_79_cp035_procesar2.py (0 capturas /api/ tras aceptar el dialogo, confirmado con listener de response)."
+  }
+}

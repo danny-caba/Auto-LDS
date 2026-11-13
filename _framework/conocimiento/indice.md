@@ -1,6 +1,6 @@
 # Índice de conocimiento (generado — no editar a mano)
 
-_Actualizado: 2026-11-06T05:36:57.036121_
+_Actualizado: 2026-11-13T10:52:36.154679_
 
 ## Conocimiento general
 
@@ -32,10 +32,20 @@ _Actualizado: 2026-11-06T05:36:57.036121_
 - **CONO-0017** [VERIFICADO] — El selector de sucursal de una pantalla se activa cuando el centro_servicio del area asociada al ROL del usuario tiene 2... _(fuente: Memoria de sesion - investigacion en vivo multi-sucursal (varios proyectos))_
 - **CONO-0018** [VERIFICADO] — La VM bloquea pip/npm install por un proxy MITM (error SELF_SIGNED_CERT_IN_CHAIN) - para consultas a la BD Informix de W... _(fuente: Memoria de sesion - acceso a BD Informix)_
 - **CONO-0021** [PROVISIONAL] — La cuenta SCASTI_DW (clave rotativa, ver generate_scripts.py de cada proyecto para la vigente) es reutilizable entre pro... _(fuente: Memoria de sesion - cuentas de prueba reutilizables)_
+- **CONO-0026** [VERIFICADO] — Tecnica para diagnosticar con precision un error 'blocked by CORS policy' en Playwright: NO asumir que el defecto es sol... _(fuente: Diagnostico en vivo 13/11/2026 (PR000349-SP9, _exploracion/explore_81 a explore_83))_
+- **CONO-0027** [VERIFICADO] — No alcanza con chequear boton.is_enabled() para confirmar que una pantalla 'restringe' una accion - algunas pantallas de... _(fuente: Correccion en vivo 13/11/2026 (PR000349-SP9 CP006, validado primero a mano por el usuario))_
+- **CONO-0028** [VERIFICADO] — CONFIRMADO 13/11/2026 por el usuario contra el maestro de seguridad: el bloqueo de CP039/CP040 (RF-06, PR000349-SP9) NO ... _(fuente: Confirmacion del usuario 13/11/2026 (PR000349-SP9, tras revisar el maestro de seguridad))_
 
 ### mac-atencion-integral
 
 - **CONO-0020** [VERIFICADO] — El modulo MAC (Atencion Integral MAC) tuvo un 'Acceso Denegado' real por permiso faltante - quedo corregido del lado de ... _(fuente: Memoria de sesion - PR000335-SP5 cierre RF-04)_
+
+### modificacion-gestioncliente
+
+- **CONO-0022** [VERIFICADO] — Rutas de menu reales (cuenta DCABA_DW, 13/11/2026) de las 7 pantallas de PR000349-SP10 (Gestion de Cliente / Modificacio... _(fuente: Exploracion en vivo 13/11/2026 (_exploracion/explore_03_rutas.py y explore_04_abrir_cada_app.py))_
+- **CONO-0023** [INVALIDADO] — RF-01 (Antiguedad de Saldo, rol MODANTI) y RF-05 (Asignacion de Clientes Reincorporados, rol LUZRETIC) de PR000349-SP10 ... _(fuente: Exploracion en vivo 13/11/2026 (_exploracion/explore_01_menu.py y explore_02_scasti.py))_
+- **CONO-0024** [PROVISIONAL] — Campos/selectores reales (ids del DOM) de las 7 pantallas de PR000349-SP10 ya mapeados y documentados como modulos reusa... _(fuente: Exploracion en vivo 13/11/2026 (_exploracion/explore_05 a explore_12, ver PR000349-SP10/_exploracion/))_
+- **CONO-0025** [VERIFICADO] — RESUELTO 13/11/2026: tras una correccion de configuracion de roles pedida al usuario, RF-01 (Modificacion De Antiguedad ... _(fuente: Exploracion en vivo 13/11/2026 (_exploracion/explore_14 a explore_16))_
 
 ### synergia-reclamos
 
@@ -53,4 +63,4 @@ _Actualizado: 2026-11-06T05:36:57.036121_
 
 ## Dudas pendientes
 
-  _(sin entradas todavia)_
+- **CONO-0023** [INVALIDADO] — RF-01 (Antiguedad de Saldo, rol MODANTI) y RF-05 (Asignacion de Clientes Reincorporados, rol LUZRETIC) de PR000349-SP10 ... _(fuente: Exploracion en vivo 13/11/2026 (_exploracion/explore_01_menu.py y explore_02_scasti.py))_

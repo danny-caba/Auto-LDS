@@ -1,0 +1,18 @@
+{
+  "id": "CONO-0028",
+  "tipo": "COMPORTAMIENTO_OBSERVADO",
+  "descripcion": "CONFIRMADO 13/11/2026 por el usuario contra el maestro de seguridad: el bloqueo de CP039/CP040 (RF-06, PR000349-SP9) NO es un tema de configuracion de rol - es exactamente lo que se habia diagnosticado con el bypass de CORS (ver CONO-0026): el recurso de menu MMEXTRAE tiene la URL mal configurada (basesemcons en vez de extracsemes). Queda como defecto real reportado, esperando que desarrollo corrija la URL del recurso. Leccion: cuando un hallazgo de automatizacion senala una causa raiz precisa (con evidencia real: bypass de red, lectura de codigo fuente del ET), vale la pena sostenerla ante una hipotesis alternativa razonable (en este caso, 'puede ser el rol') en vez de descartarla prematuramente - el usuario mismo pidio verificarla con el maestro de seguridad antes de cerrar, y la verificacion confirmo el diagnostico original.",
+  "modulo": "framework-general",
+  "ambiente": null,
+  "version": null,
+  "fuente": "Confirmacion del usuario 13/11/2026 (PR000349-SP9, tras revisar el maestro de seguridad)",
+  "requerimiento_origen": "PR000349-SP9",
+  "referencias_evidencia": [],
+  "estado": "VERIFICADO",
+  "fecha_creacion": "2026-11-13",
+  "fecha_ultima_verificacion": "2026-11-13",
+  "condiciones_revalidacion": null,
+  "reemplaza": null,
+  "reemplazada_por": null,
+  "motivo_invalidacion": null
+}

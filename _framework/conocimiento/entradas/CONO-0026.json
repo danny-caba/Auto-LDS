@@ -1,0 +1,22 @@
+{
+  "id": "CONO-0026",
+  "tipo": "SOLUCION_TECNICA_COMPROBADA",
+  "descripcion": "Tecnica para diagnosticar con precision un error 'blocked by CORS policy' en Playwright: NO asumir que el defecto es solo el header faltante - interceptar la llamada con context.route(patron, handler) y, dentro del handler, usar route.fetch() (hace el request real, no esta sujeto al CORS del navegador porque lo ejecuta el driver, no el motor de renderizado) + route.fulfill(response=response, headers={**dict(response.headers), 'access-control-allow-origin': origen}) para reenviar la MISMA respuesta al navegador con el header agregado. Si tras esto la pantalla sigue sin cargar, el problema NO es CORS sino lo que revela el status/body real de esa respuesta (confirmado en vivo 13/11/2026, PR000349-SP9 CP039/CP040 RF-06: el error de consola decia 'blocked by CORS policy: No Access-Control-Allow-Origin header', pero con el bypass la respuesta real resulto ser 404 Not Found de nginx - la aplicacion ni siquiera estaba desplegada en ese ambiente, el aviso de CORS era solo un sintoma secundario de que una respuesta de error no trae ese header). Mismo patron de mensaje de consola ya visto antes en PR000325-SP5 (modulo 'administra') SIN haberse validado con este bypass en su momento - no asumir automaticamente que dos avisos de CORS identicos comparten la misma causa raiz sin repetir esta verificacion.",
+  "modulo": "framework-general",
+  "ambiente": null,
+  "version": null,
+  "fuente": "Diagnostico en vivo 13/11/2026 (PR000349-SP9, _exploracion/explore_81 a explore_83)",
+  "requerimiento_origen": "PR000349-SP9",
+  "referencias_evidencia": [
+    "PR000349-SP9/_exploracion/explore_81_cp039_040_bypass_cors.py",
+    "PR000349-SP9/_exploracion/explore_82_cp039_040_doble_slash.py",
+    "PR000349-SP9/_exploracion/explore_83_cp039_040_probar_base.py"
+  ],
+  "estado": "VERIFICADO",
+  "fecha_creacion": "2026-11-13",
+  "fecha_ultima_verificacion": "2026-11-13",
+  "condiciones_revalidacion": null,
+  "reemplaza": null,
+  "reemplazada_por": null,
+  "motivo_invalidacion": null
+}

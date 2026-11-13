@@ -1,0 +1,26 @@
+{
+  "id": "CONO-0024",
+  "tipo": "COMPORTAMIENTO_OBSERVADO",
+  "descripcion": "Campos/selectores reales (ids del DOM) de las 7 pantallas de PR000349-SP10 ya mapeados y documentados como modulos reusables en _framework/modulos/ (bloqueo_reposicion.py, asignacion_rutas_clientes.py, cambio_sucursal_clientes.py, consulta_modificaciones_refacturaciones.py, mantenimiento_empleados_descuento.py, modificacion_fecha_contrato.py, modificacion_direccion_reparto.py). Las 7 comparten el patron: #numeroCliente + boton 'Leer' + campos de solo lectura que se llenan tras la consulta + campos editables (inicialmente disabled) para la modificacion + boton de accion final (Bloquear/Actualizar/Grabar/Modificar/Ingresar, todos nacen disabled hasta un Leer exitoso). selector_pantalla recomendado para abrir_aplicacion(): '#numeroCliente' (el componente Angular raiz de las 9 apps nuevas de este sprint es 'app-root' generico, no sirve para diferenciar pantallas). El boton '?' de busqueda de cliente en RF-07 (Mantenimiento de Empleados) resulto INTERMITENTE: aparecio 1 de 3 intentos con el mismo locator exacto (get_by_role('button', name='?')) - no se pudo diagnosticar la causa en 3 intentos (limite de la politica de autonomia), documentado como pendiente de investigar con mas tiempo antes de depender de el en un generate_scripts.py real.",
+  "modulo": "modificacion-gestioncliente",
+  "ambiente": null,
+  "version": null,
+  "fuente": "Exploracion en vivo 13/11/2026 (_exploracion/explore_05 a explore_12, ver PR000349-SP10/_exploracion/)",
+  "requerimiento_origen": "PR000349-SP10",
+  "referencias_evidencia": [
+    "_framework/modulos/bloqueo_reposicion.py",
+    "_framework/modulos/asignacion_rutas_clientes.py",
+    "_framework/modulos/cambio_sucursal_clientes.py",
+    "_framework/modulos/consulta_modificaciones_refacturaciones.py",
+    "_framework/modulos/mantenimiento_empleados_descuento.py",
+    "_framework/modulos/modificacion_fecha_contrato.py",
+    "_framework/modulos/modificacion_direccion_reparto.py"
+  ],
+  "estado": "PROVISIONAL",
+  "fecha_creacion": "2026-11-13",
+  "fecha_ultima_verificacion": null,
+  "condiciones_revalidacion": null,
+  "reemplaza": null,
+  "reemplazada_por": null,
+  "motivo_invalidacion": null
+}

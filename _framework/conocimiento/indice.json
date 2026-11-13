@@ -118,7 +118,56 @@
       "estado": "PROVISIONAL",
       "resumen": "La cuenta SCASTI_DW (clave rotativa, ver generate_scripts.py de cada proyecto para la vigente) es reutilizable entre pro...",
       "fuente": "Memoria de sesion - cuentas de prueba reutilizables"
+    },
+    "CONO-0022": {
+      "tipo": "COMPORTAMIENTO_OBSERVADO",
+      "modulo": "modificacion-gestioncliente",
+      "estado": "VERIFICADO",
+      "resumen": "Rutas de menu reales (cuenta DCABA_DW, 13/11/2026) de las 7 pantallas de PR000349-SP10 (Gestion de Cliente / Modificacio...",
+      "fuente": "Exploracion en vivo 13/11/2026 (_exploracion/explore_03_rutas.py y explore_04_abrir_cada_app.py)"
+    },
+    "CONO-0023": {
+      "tipo": "DUDA_PENDIENTE",
+      "modulo": "modificacion-gestioncliente",
+      "estado": "INVALIDADO",
+      "resumen": "RF-01 (Antiguedad de Saldo, rol MODANTI) y RF-05 (Asignacion de Clientes Reincorporados, rol LUZRETIC) de PR000349-SP10 ...",
+      "fuente": "Exploracion en vivo 13/11/2026 (_exploracion/explore_01_menu.py y explore_02_scasti.py)"
+    },
+    "CONO-0024": {
+      "tipo": "COMPORTAMIENTO_OBSERVADO",
+      "modulo": "modificacion-gestioncliente",
+      "estado": "PROVISIONAL",
+      "resumen": "Campos/selectores reales (ids del DOM) de las 7 pantallas de PR000349-SP10 ya mapeados y documentados como modulos reusa...",
+      "fuente": "Exploracion en vivo 13/11/2026 (_exploracion/explore_05 a explore_12, ver PR000349-SP10/_exploracion/)"
+    },
+    "CONO-0025": {
+      "tipo": "COMPORTAMIENTO_OBSERVADO",
+      "modulo": "modificacion-gestioncliente",
+      "estado": "VERIFICADO",
+      "resumen": "RESUELTO 13/11/2026: tras una correccion de configuracion de roles pedida al usuario, RF-01 (Modificacion De Antiguedad ...",
+      "fuente": "Exploracion en vivo 13/11/2026 (_exploracion/explore_14 a explore_16)"
+    },
+    "CONO-0026": {
+      "tipo": "SOLUCION_TECNICA_COMPROBADA",
+      "modulo": "framework-general",
+      "estado": "VERIFICADO",
+      "resumen": "Tecnica para diagnosticar con precision un error 'blocked by CORS policy' en Playwright: NO asumir que el defecto es sol...",
+      "fuente": "Diagnostico en vivo 13/11/2026 (PR000349-SP9, _exploracion/explore_81 a explore_83)"
+    },
+    "CONO-0027": {
+      "tipo": "REGLA_DOCUMENTADA",
+      "modulo": "framework-general",
+      "estado": "VERIFICADO",
+      "resumen": "No alcanza con chequear boton.is_enabled() para confirmar que una pantalla 'restringe' una accion - algunas pantallas de...",
+      "fuente": "Correccion en vivo 13/11/2026 (PR000349-SP9 CP006, validado primero a mano por el usuario)"
+    },
+    "CONO-0028": {
+      "tipo": "COMPORTAMIENTO_OBSERVADO",
+      "modulo": "framework-general",
+      "estado": "VERIFICADO",
+      "resumen": "CONFIRMADO 13/11/2026 por el usuario contra el maestro de seguridad: el bloqueo de CP039/CP040 (RF-06, PR000349-SP9) NO ...",
+      "fuente": "Confirmacion del usuario 13/11/2026 (PR000349-SP9, tras revisar el maestro de seguridad)"
     }
   },
-  "actualizado_en": "2026-11-06T05:36:57.036121"
+  "actualizado_en": "2026-11-13T10:52:36.154679"
 }

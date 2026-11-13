@@ -1,0 +1,18 @@
+{
+  "_CP046_invalidado": {
+    "motivo": "INVALIDADO 12/11/2026: el usuario reprodujo manualmente el escenario C (Clase vacia) y confirmo que Enviar SI esta habilitado y SI muestra 'Debe ingresar la Clase' - verificado tambien en vivo con _exploracion/debug_cp046_recheck.py (boton_enviar.is_enabled()=True, click real mostro el mensaje esperado). El hallazgo anterior (08/11/2026, boton deshabilitado) ya no es reproducible - posiblemente era intermitente o se corrigio sin aviso. CP046 vuelve a tratarse como caso normal (no FALLIDO), test corregido en generate_scripts.py para validar el flujo correcto (Enviar habilitado + mensaje).",
+    "fecha_verificacion": "2026-11-12"
+  },
+  "CP033": {
+    "id_defecto": "H005",
+    "motivo": "DEFECTO REAL confirmado en vivo 12/11/2026 con la orden EXTRAC 500007: la pantalla de Reasignacion de Orden abre bien (titulo correcto 'Reasignacion de la Orden Nro.500007'), pero los 4 pares rotulo/valor (Tipo de Orden, Rol Creador, Rol Emisor, Rol Actual) quedan VACIOS - deberian mostrar 'EXTRAC (Requerimiento)', 'ANA (fecha)', 'ANA (fecha)', 'DACD' respectivamente (eso SI funcionaba en SP8 original, confirmado por los asserts hardcodeados de esa epoca). Para ordenes SEGEN el mismo modal SI completa los 4 pares correctamente (confirmado con la orden 3365696 en CP060: 'SEGEN (Requerimiento)', 'CCQ (2017-10-11 11:32)', etc.) - el binding de datos de este componente esta roto especificamente para tipo_orden=EXTRAC.",
+    "fecha_verificacion": "2026-11-12",
+    "evidencia": "run_all.py --solo CP033 --video, FALLO real: assert de los 4 pares con valor esperado fallo (todos vacios). Reproducido ademas con _exploracion/debug_cp033_recheck.py fuera de run_all, mismo resultado."
+  },
+  "CP036": {
+    "id_defecto": "H005",
+    "motivo": "DEFECTO REAL confirmado en vivo 12/11/2026, mismo origen que CP033 (H005): con la Nueva Area Ejecutora vacia en la Reasignacion de la orden EXTRAC 500007, presionar Aceptar NO muestra el mensaje esperado 'Debe ingresar el Area Ejecutora' - el modal se cierra EN SILENCIO (sin dialogo de validacion ni de exito) y vuelve a la bandeja. Confirmado que la orden no se reasigna de verdad (sigue en Requerimiento/rol_actual=DACD) - no es que el envio haya funcionado sin pedir el campo, es que no valida ni informa nada. Consistente con que el formulario de Reasignacion para EXTRAC no tiene su estado/validacion bien inicializado (ver CP033).",
+    "fecha_verificacion": "2026-11-12",
+    "evidencia": "run_all.py --solo CP036 --video, FALLO real: no aparecio ningun dialogo de 'Ventana de Validacion' tras Aceptar. Reproducido tambien con _exploracion/debug_cp036_recheck.py: 0 dialogos tras el click, bandeja vuelve a 'Todas las Ordenes' con 500007 todavia en Requerimiento/DACD."
+  }
+}

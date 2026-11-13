@@ -1,0 +1,22 @@
+{
+  "id": "CONO-0022",
+  "tipo": "COMPORTAMIENTO_OBSERVADO",
+  "descripcion": "Rutas de menu reales (cuenta DCABA_DW, 13/11/2026) de las 7 pantallas de PR000349-SP10 (Gestion de Cliente / Modificacion) que SI aparecen en el menu lateral 'Aplicaciones': RF-02 Bloqueo de Reposicion esta bajo Tecnico > 'Bloqueo De Reconexion' (NO bajo Comercial como el resto, y el nombre real en el menu es 'Bloqueo De Reconexion', no 'Bloqueo de Reposicion' - coincide con el termino literal que usa el propio sistema segun el EF). Las otras 6 estan directo bajo Comercial (sin categoria intermedia): RF-03 'Asignacion De Rutas A Clientes', RF-04 'Cambio De Sucursal De Clientes', RF-06 'Consulta De Modificaciones Y Refacturaciones', RF-07 'Mantenimiento De Empleados Con Descuento', RF-08 'Modificacion De Fecha De Contrato', RF-09 'Modificacion De Direccion De Reparto' (NO 'Modificacion de Direcciones' como dice el EF - el nombre real en el menu usa 'Direccion De Reparto'). Las 7 abrieron el popup + iframe #aplicacion sin 'Acceso Denegado', selector raiz app-root (generico, falta explorar el componente interno real de cada una en la Etapa 3).",
+  "modulo": "modificacion-gestioncliente",
+  "ambiente": null,
+  "version": null,
+  "fuente": "Exploracion en vivo 13/11/2026 (_exploracion/explore_03_rutas.py y explore_04_abrir_cada_app.py)",
+  "requerimiento_origen": "PR000349-SP10",
+  "referencias_evidencia": [
+    "PR000349-SP10/_exploracion/rutas_menu.json",
+    "PR000349-SP10/_exploracion/resultados_smoke.json",
+    "PR000349-SP10/_exploracion/dump_RF-0*_ok.png"
+  ],
+  "estado": "VERIFICADO",
+  "fecha_creacion": "2026-11-13",
+  "fecha_ultima_verificacion": "2026-11-13",
+  "condiciones_revalidacion": null,
+  "reemplaza": null,
+  "reemplazada_por": null,
+  "motivo_invalidacion": null
+}

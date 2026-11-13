@@ -1,0 +1,34 @@
+{
+  "Transversal": {
+    "nombre": "Inicio de sesión y acceso al menú",
+    "ventana": "Plataforma Web LDS"
+  },
+  "RF-01": {
+    "nombre": "Bandeja de órdenes y acceso al aplicativo",
+    "ventana": "Administrador De Solicitudes De Trabajo"
+  },
+  "RF-02": {
+    "nombre": "Búsqueda específica de órdenes",
+    "ventana": "Búsqueda - <Estado>"
+  },
+  "RF-03": {
+    "nombre": "Historial de la orden y sus observaciones",
+    "ventana": "Historia de la Orden # <Número>"
+  },
+  "RF-04": {
+    "nombre": "Reasignación de la orden",
+    "ventana": "Reasignación de la Orden Nro.<Número>"
+  },
+  "RF-05": {
+    "nombre": "Orden de extracción: adjunto y finalización",
+    "ventana": "Extractor"
+  },
+  "RF-06": {
+    "nombre": "Solicitud Especial (SEGEN): creación, consulta/modificación, envío, finalización y exportación",
+    "ventana": "Creación de una Solicitud Especial"
+  },
+  "RF-07": {
+    "nombre": "Modal dinámico de consulta (buscadores \"…\")",
+    "ventana": "Consultar <Rol/Area | Cliente>"
+  }
+}

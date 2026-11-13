@@ -1314,31 +1314,38 @@ capturar_paso(app, "orden_en_estado_finalizacion", paso_excel=2)
 
 CUERPOS_REALES["CP043"] = '''
 app, frame = abrir_adsoltra(page, paso_excel=1)
-buscar_y_seleccionar_orden(app, frame, "4128447")
+buscar_y_seleccionar_orden(app, frame, "500007")
 frame.locator("button", has_text="Consultar/Modificar").first.click()
 app.wait_for_timeout(2500)
 extractor = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile("Extractor")).last
 assert extractor.count() and extractor.first.is_visible(), "No se abrio el Extractor de la orden de prueba"
-capturar_paso(app, "extractor_no_finalizado", paso_excel=1)
+nombre_archivo_adjunto = extractor.first.locator("#extAdjunto").input_value()
+print(f"ARCHIVO ADJUNTO ANTES DE FINALIZAR: {nombre_archivo_adjunto!r}")
+capturar_paso(app, f"extractor_no_finalizado_archivo_{nombre_archivo_adjunto}", paso_excel=1)
 
 mensaje_resultado = None
-for _intento in range(3):
+for _intento in range(6):
     extractor.first.locator("button", has_text="Finalizar").click(force=True)
-    app.wait_for_timeout(1500)
+    app.wait_for_timeout(2500)
     error_servicio = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile("Error de Servicio"))
     if error_servicio.count() and error_servicio.last.is_visible():
         error_servicio.last.get_by_role("button", name=re.compile("Cancelar", re.I)).click(force=True)
-        app.wait_for_timeout(1200)
+        app.wait_for_timeout(2000)
         continue
     confirmacion = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile("Confirmación EXTRAC"))
-    assert confirmacion.count() and confirmacion.last.is_visible(), "No se vio la confirmacion esperada antes de finalizar"
+    for _ in range(6):
+        if confirmacion.count() and confirmacion.last.is_visible():
+            break
+        app.wait_for_timeout(500)
+    if not (confirmacion.count() and confirmacion.last.is_visible()):
+        continue
     capturar_paso(app, "confirmacion_antes_de_finalizar", paso_excel=2)
     confirmacion.last.get_by_role("button", name=re.compile("^Aceptar$", re.I)).click(force=True)
     app.wait_for_timeout(2500)
     dlg_resultado = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile("Ventana de Validación|Error de Servicio"))
     if dlg_resultado.count() and "Error de Servicio" in dlg_resultado.first.inner_text():
         dlg_resultado.first.get_by_role("button", name=re.compile("Cancelar", re.I)).click(force=True)
-        app.wait_for_timeout(1200)
+        app.wait_for_timeout(2000)
         continue
     assert dlg_resultado.count() and dlg_resultado.first.is_visible(), "No se vio el mensaje de resultado de la finalizacion"
     mensaje_resultado = dlg_resultado.first.inner_text()
@@ -1347,12 +1354,14 @@ for _intento in range(3):
     app.wait_for_timeout(1500)
     break
 assert mensaje_resultado is not None, "No se pudo completar la finalizacion tras varios intentos (Error de Servicio persistente)"
-assert "La Orden 4128447 ha sido finalizado correctamente" in mensaje_resultado, f"Mensaje de confirmacion inesperado: {mensaje_resultado!r}"
+assert "La Orden 500007 ha sido finalizado correctamente" in mensaje_resultado, f"Mensaje de confirmacion inesperado: {mensaje_resultado!r}"
 
-# DEFECTO REAL confirmado en vivo 07/11/2026 (ver casos_fallidos_confirmados.json,
-# 2/2 ordenes reales distintas fallan igual): el sistema deberia retirar el
+# DEFECTO REAL confirmado en vivo (ver casos_fallidos_confirmados.json,
+# 3/3 ordenes reales distintas fallan igual): el sistema deberia retirar el
 # adjunto del repositorio al finalizar, pero siempre informa que no pudo.
-assert "no pudo retirarse del repositorio" not in mensaje_resultado, f"Defecto real: el sistema deberia retirar el adjunto del repositorio al finalizar, pero informo: {mensaje_resultado!r}"
+# El nombre del archivo (nombre_archivo_adjunto, impreso antes de Finalizar)
+# confirma que SI habia un archivo real registrado para esta orden.
+assert "no pudo retirarse del repositorio" not in mensaje_resultado, f"Defecto real: el sistema deberia retirar el adjunto del repositorio al finalizar (archivo {nombre_archivo_adjunto!r}), pero informo: {mensaje_resultado!r}"
 '''
 
 CUERPOS_REALES["CP039"] = '''
@@ -1714,6 +1723,558 @@ assert not boton_enviar.first.is_enabled(), "Defecto real (vs matriz): Enviar de
 capturar_paso(app, "escenario_c_enviar_deshabilitado_sin_clase", paso_excel=4)
 '''
 
+CUERPOS_REALES["CP047"] = '''
+app, frame = abrir_adsoltra(page, paso_excel=1)
+
+# Escenario A: Tipo de Orden AC, Nro. Cliente vacio
+overlay = abrir_segen(app, frame)
+opciones_tipo = overlay.first.locator("#segTipoOrden option")
+for _ in range(20):
+    if opciones_tipo.count() > 1:
+        break
+    app.wait_for_timeout(300)
+overlay.first.locator("#segTipoOrden").select_option(label="AC = ATENCION COMERCIAL")
+app.wait_for_timeout(500)
+overlay.first.locator("#segUsuarioDestino").fill("EPSG")
+overlay.first.locator("textarea").last.fill("CP047 escenario A - cliente vacio con tipo AC")
+overlay.first.locator("button", has_text="Enviar").click(force=True)
+app.wait_for_timeout(2000)
+mensaje_a = cerrar_dialogo_validacion_si_aparece(app, frame)
+assert mensaje_a and "Debe Ingresar el Numero del Cliente" in mensaje_a, f"Mensaje inesperado en escenario A: {mensaje_a!r}"
+capturar_paso(app, "escenario_a_cliente_obligatorio_AC", paso_excel=3)
+overlay.first.locator("button", has_text="Cancelar").click(force=True)
+app.wait_for_timeout(1000)
+
+# Escenario B: Tipo de Orden distinto de AC (SR), Nro. Cliente vacio -
+# la matriz espera que el cliente NO se exija y la solicitud se envie
+# con los demas datos validos. Mismo combo valido usado en CP044 (SR,
+# Tema 020, primer Trabajo/Formulario, primera Clase, EPSG) - esto
+# deberia topar con el defecto REAL YA CONFIRMADO en CP044
+# (RegistrarOrdenSegen HTTP 500, INSERT mal formado), no con un mensaje
+# de cliente obligatorio.
+overlay = abrir_segen(app, frame)
+overlay.first.locator("#segTipoOrden").select_option(label="SR = SOLICITUD DE SERVICIO EN RUTINA")
+app.wait_for_timeout(500)
+overlay.first.locator("#segTema").select_option(label="020 = Clientes")
+app.wait_for_timeout(800)
+overlay.first.locator("#segTrabajo").select_option(index=1)
+app.wait_for_timeout(800)
+opciones_form = overlay.first.locator("#segFormulario option")
+if opciones_form.count() > 1:
+    overlay.first.locator("#segFormulario").select_option(index=1)
+overlay.first.locator("#segClase").select_option(index=1)
+app.wait_for_timeout(500)
+overlay.first.locator("#segUsuarioDestino").fill("EPSG")
+overlay.first.locator("textarea").last.fill("CP047 escenario B - cliente vacio con tipo distinto de AC")
+overlay.first.locator("button", has_text="Enviar").click(force=True)
+app.wait_for_timeout(3000)
+dlg_error = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile("Error de Servicio"))
+dlg_resultado = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile("Ventana de Validación"))
+mensaje_b = dlg_resultado.first.inner_text() if dlg_resultado.count() and dlg_resultado.first.is_visible() else None
+assert not (dlg_error.count() and dlg_error.last.is_visible()), f"Defecto real (mismo que CP044): RegistrarOrdenSegen devuelve Error de Servicio en vez de confirmar el envio sin cliente: {dlg_error.last.inner_text() if dlg_error.count() else None!r}"
+assert mensaje_b is not None and "Debe Ingresar el Numero del Cliente" not in mensaje_b, f"No deberia exigirse el cliente con tipo de orden distinto de AC: {mensaje_b!r}"
+assert "ha sido enviada" in mensaje_b, f"Bloqueado por el mismo defecto real de CP044 (RegistrarOrdenSegen): {mensaje_b!r}"
+capturar_paso(app, "escenario_b_cliente_no_exigido", paso_excel=5)
+'''
+
+CUERPOS_REALES["CP048"] = '''
+app, frame = abrir_adsoltra(page, paso_excel=1)
+
+# Paso 2-5 de la matriz: cadena Tema -> Trabajo (funciona bien, se
+# confirma primero antes de aislar el defecto real de Trabajo -> Formulario)
+overlay = abrir_segen(app, frame)
+opciones_tipo = overlay.first.locator("#segTipoOrden option")
+for _ in range(20):
+    if opciones_tipo.count() > 1:
+        break
+    app.wait_for_timeout(300)
+
+overlay.first.locator("#segTema").select_option(label="020 = Clientes")
+opciones_trabajo_020 = overlay.first.locator("#segTrabajo option")
+for _ in range(20):
+    if opciones_trabajo_020.count() > 1:
+        break
+    app.wait_for_timeout(300)
+codigos_020 = [opciones_trabajo_020.nth(i).text_content().strip() for i in range(1, opciones_trabajo_020.count())]
+assert all(c.startswith("020") for c in codigos_020), f"Los trabajos deberian empezar todos con el codigo del Tema 020: {codigos_020[:5]!r}"
+capturar_paso(app, "trabajos_recargados_con_tema_020", paso_excel=2)
+
+overlay.first.locator("#segTema").select_option(label="001 = Nuevos Clientes")
+opciones_trabajo_001 = overlay.first.locator("#segTrabajo option")
+for _ in range(20):
+    textos = [opciones_trabajo_001.nth(i).text_content().strip() for i in range(1, opciones_trabajo_001.count())]
+    if textos and all(c.startswith("001") for c in textos):
+        break
+    app.wait_for_timeout(300)
+codigos_001 = [opciones_trabajo_001.nth(i).text_content().strip() for i in range(1, opciones_trabajo_001.count())]
+assert codigos_001 and all(c.startswith("001") for c in codigos_001), f"Al cambiar de Tema, los trabajos deberian recargarse con el codigo del Tema 001: {codigos_001[:5]!r}"
+capturar_paso(app, "trabajos_recargados_al_cambiar_de_tema", paso_excel=5)
+overlay.first.locator("button", has_text="Cancelar").click(force=True)
+app.wait_for_timeout(1000)
+
+# DEFECTO REAL DE BACKEND confirmado en vivo 10/11/2026: el combo de
+# Trabajo manda su VALUE completo (tema+trabajo concatenado, ej
+# "020000") al endpoint ConsultarFormulariosPorTrabajo como si fuera el
+# codigo de trabajo puro - pero en la tabla real `textord` el campo
+# `trabajo` guarda solo el sufijo sin el tema (ej "000"), confirmado por
+# SQL directo (empresa='7', tema='020', trabajo='000' -> 2 filas reales:
+# idtexto 64 "Verificacion Capacidad empalme" e idtexto 118 "Reclamo
+# Contratista"; la misma consulta con trabajo='020000' -> 0 filas). El
+# POST real queda {"tema":"020","trabajo":"020000"} y SIEMPRE responde
+# [] sin importar el trabajo elegido - el combo de Formulario nunca
+# puede mostrar nada en ningun par Tema+Trabajo.
+overlay = abrir_segen(app, frame)
+overlay.first.locator("#segTema").select_option(label="020 = Clientes")
+opciones_trabajo = overlay.first.locator("#segTrabajo option")
+for _ in range(20):
+    if opciones_trabajo.count() > 1:
+        break
+    app.wait_for_timeout(300)
+with app.expect_response(lambda r: "ConsultarFormulariosPorTrabajo" in r.url):
+    overlay.first.locator("#segTrabajo").select_option(label="020000")
+app.wait_for_timeout(1000)
+opciones_form = overlay.first.locator("#segFormulario option")
+textos_form = [opciones_form.nth(i).text_content().strip() for i in range(opciones_form.count())]
+capturar_paso(app, "formulario_vacio_tras_elegir_trabajo", paso_excel=3)
+assert len(textos_form) > 1, f"DEFECTO REAL: el combo de Formulario deberia mostrar los 2 formularios reales de Tema 020 + Trabajo 000 (idtexto 64 y 118), pero el backend compara 'trabajo' con el codigo completo '020000' en vez del codigo real '000' y siempre devuelve una lista vacia: {textos_form!r}"
+'''
+
+CUERPOS_REALES["CP050"] = '''
+app, frame = abrir_adsoltra(page, paso_excel=1)
+overlay = abrir_segen(app, frame)
+opciones_tipo = overlay.first.locator("#segTipoOrden option")
+for _ in range(20):
+    if opciones_tipo.count() > 1:
+        break
+    app.wait_for_timeout(300)
+overlay.first.locator("#segTipoOrden").select_option(label="AC = ATENCION COMERCIAL")
+app.wait_for_timeout(500)
+
+# Paso 2-3: cliente existente con medidor instalado (orden real 500007)
+overlay.first.locator("#segNumeroCliente").fill("1391305")
+overlay.first.locator("#segNumeroCliente").press("Tab")
+app.wait_for_timeout(2000)
+nombre = overlay.first.locator("#segNombreCliente").input_value()
+alimentador = overlay.first.locator("#segAlimentador").input_value()
+ruta = overlay.first.locator("#segRuta").input_value()
+llave = overlay.first.locator("#segLlave").input_value()
+texto_overlay = overlay.first.inner_text()
+assert nombre == "CORTEZ SANCHEZ DE ARRIAGA IRMA ELIZABETH", f"Nombre inesperado: {nombre!r}"
+assert "CALLE D MARGEN IZQ. KM 29" in texto_overlay and "CIENEGUILLA" in texto_overlay, f"Direccion/comuna no se cargaron: {texto_overlay[-400:]!r}"
+assert alimentador == "MA - 41", f"Alimentador inesperado: {alimentador!r}"
+assert ruta == "019 - 831 - 0800", f"Ruta inesperada: {ruta!r}"
+assert llave == "A11407 - 4", f"Llave inesperada: {llave!r}"
+assert "6034669" in texto_overlay and "ABB" in texto_overlay, f"Medidor instalado no se cargo: {texto_overlay[-400:]!r}"
+capturar_paso(app, "datos_cliente_cargados", paso_excel=3)
+
+# Paso 4: cliente inexistente - mensaje y limpieza
+overlay.first.locator("#segNumeroCliente").fill("9999999999")
+overlay.first.locator("#segNumeroCliente").press("Tab")
+app.wait_for_timeout(2000)
+mensaje = cerrar_dialogo_validacion_si_aparece(app, frame)
+assert mensaje and "El cliente N\\u00b0 9999999999 no existe" in mensaje, f"Mensaje inesperado para cliente inexistente: {mensaje!r}"
+nombre_tras_inexistente = overlay.first.locator("#segNombreCliente").input_value()
+alimentador_tras_inexistente = overlay.first.locator("#segAlimentador").input_value()
+assert nombre_tras_inexistente == "", f"El nombre deberia quedar vacio con un cliente inexistente: {nombre_tras_inexistente!r}"
+assert alimentador_tras_inexistente == "", f"El alimentador deberia quedar vacio con un cliente inexistente: {alimentador_tras_inexistente!r}"
+capturar_paso(app, "cliente_inexistente_datos_limpios", paso_excel=4)
+
+# Paso 5: primer cliente otra vez, despues un SEGUNDO cliente valido
+# distinto - los datos (incluidos medidores) deben limpiarse/reemplazarse
+overlay.first.locator("#segNumeroCliente").fill("1391305")
+overlay.first.locator("#segNumeroCliente").press("Tab")
+app.wait_for_timeout(2000)
+assert overlay.first.locator("#segNombreCliente").input_value() == "CORTEZ SANCHEZ DE ARRIAGA IRMA ELIZABETH", "No se recargo el primer cliente"
+
+overlay.first.locator("#segNumeroCliente").fill("508904")
+overlay.first.locator("#segNumeroCliente").press("Tab")
+app.wait_for_timeout(2000)
+nombre2 = overlay.first.locator("#segNombreCliente").input_value()
+alimentador2 = overlay.first.locator("#segAlimentador").input_value()
+ruta2 = overlay.first.locator("#segRuta").input_value()
+llave2 = overlay.first.locator("#segLlave").input_value()
+texto_overlay2 = overlay.first.inner_text()
+assert nombre2 == "NUÑEZ VILCA VDA DE GAMARRA EMILIA", f"No se cargo el segundo cliente: {nombre2!r}"
+assert alimentador2 == "SM - 11", f"Alimentador del segundo cliente inesperado: {alimentador2!r}"
+assert ruta2 == "019 - 902 - 1000", f"Ruta del segundo cliente inesperada: {ruta2!r}"
+assert llave2 == "A10145 - 2", f"Llave del segundo cliente inesperada: {llave2!r}"
+assert "6034669" not in texto_overlay2 and "MA - 41" not in texto_overlay2, f"Los datos/medidor del primer cliente deberian haberse limpiado al cambiar de cliente: {texto_overlay2[-400:]!r}"
+capturar_paso(app, "segundo_cliente_reemplaza_datos_anteriores", paso_excel=5)
+'''
+
+CUERPOS_REALES["CP055"] = '''
+from pypdf import PdfReader
+
+app, frame = abrir_adsoltra(page, paso_excel=1)
+
+# Escenario A: modo consulta (orden real 3365694, rol_actual=EXPLRECAU
+# distinto del rol de la sesion DACD -> abre en solo lectura)
+buscar_y_seleccionar_orden(app, frame, "3365694", tipo_orden="SEGEN = Solicitudes Especiales")
+frame.locator("button", has_text=re.compile("Consultar|Modificar")).first.click(force=True)
+app.wait_for_timeout(3000)
+modal_a = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile("Solicitud Especial")).last
+assert not modal_a.get_by_role("button", name=re.compile("^Enviar$", re.I)).first.is_enabled(), "En modo consulta Enviar deberia estar deshabilitado"
+assert not modal_a.get_by_role("button", name=re.compile("^Finalizar$", re.I)).first.is_enabled(), "En modo consulta Finalizar deberia estar deshabilitado"
+pdf_btn_a = modal_a.get_by_role("button", name=re.compile("Descargar PDF", re.I))
+for _ in range(15):
+    if pdf_btn_a.count() and pdf_btn_a.first.is_enabled():
+        break
+    app.wait_for_timeout(500)
+assert pdf_btn_a.count() and pdf_btn_a.first.is_enabled(), "En modo consulta Descargar PDF deberia estar habilitado"
+capturar_paso(app, "escenario_a_modo_consulta", paso_excel=1)
+
+with app.expect_download(timeout=20000) as descarga_info_a:
+    pdf_btn_a.first.click(force=True)
+ruta_pdf_a = EVIDENCIA / "CP055_consulta_3365694.pdf"
+descarga_info_a.value.save_as(ruta_pdf_a)
+texto_pdf_a = "\\n".join(p.extract_text() for p in PdfReader(str(ruta_pdf_a)).pages)
+assert "3365694" in texto_pdf_a, f"El PDF deberia incluir el numero de orden: {texto_pdf_a!r}"
+assert "508904" in texto_pdf_a, f"El PDF deberia incluir el numero de cliente: {texto_pdf_a!r}"
+assert "EXPLRECAU" in texto_pdf_a, f"El PDF deberia incluir el ejecutor (rol actual): {texto_pdf_a!r}"
+assert "020906" in texto_pdf_a, f"El PDF deberia incluir el trabajo: {texto_pdf_a!r}"
+assert "Fecha Impresi" in texto_pdf_a, f"El PDF deberia incluir la fecha de impresion: {texto_pdf_a!r}"
+capturar_paso(app, "pdf_descargado_modo_consulta", paso_excel=1)
+modal_a.get_by_role("button", name=re.compile("Cancelar", re.I)).click(force=True)
+app.wait_for_timeout(1000)
+
+# Escenario B: modo modificacion (orden real 3365695, rol_actual=DACD
+# tras UPDATE directo - mismo rol que la sesion, confirmado en vivo
+# 10/11/2026 que abre con Enviar/Finalizar habilitados y campos editables)
+buscar_y_seleccionar_orden(app, frame, "3365695", tipo_orden="SEGEN = Solicitudes Especiales")
+frame.locator("button", has_text=re.compile("Consultar|Modificar")).first.click(force=True)
+app.wait_for_timeout(3000)
+modal_b = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile("Solicitud Especial")).last
+assert modal_b.get_by_role("button", name=re.compile("^Enviar$", re.I)).first.is_enabled(), "En modo modificacion Enviar deberia estar habilitado"
+assert modal_b.get_by_role("button", name=re.compile("^Finalizar$", re.I)).first.is_enabled(), "En modo modificacion Finalizar deberia estar habilitado"
+pdf_btn_b = modal_b.get_by_role("button", name=re.compile("Descargar PDF", re.I))
+for _ in range(15):
+    if pdf_btn_b.count() and pdf_btn_b.first.is_enabled():
+        break
+    app.wait_for_timeout(500)
+assert pdf_btn_b.count() and pdf_btn_b.first.is_enabled(), "En modo modificacion Descargar PDF deberia estar habilitado"
+capturar_paso(app, "escenario_b_modo_modificacion", paso_excel=2)
+
+with app.expect_download(timeout=20000) as descarga_info_b:
+    pdf_btn_b.first.click(force=True)
+ruta_pdf_b = EVIDENCIA / "CP055_modificacion_3365695.pdf"
+descarga_info_b.value.save_as(ruta_pdf_b)
+texto_pdf_b = "\\n".join(p.extract_text() for p in PdfReader(str(ruta_pdf_b)).pages)
+assert "3365695" in texto_pdf_b, f"El PDF deberia incluir el numero de orden: {texto_pdf_b!r}"
+assert "468322" in texto_pdf_b, f"El PDF deberia incluir el numero de cliente: {texto_pdf_b!r}"
+capturar_paso(app, "pdf_descargado_modo_modificacion", paso_excel=2)
+modal_b.get_by_role("button", name=re.compile("Cancelar", re.I)).click(force=True)
+app.wait_for_timeout(1000)
+
+# Escenario C: modo creacion (SEGEN) - la accion no deberia mostrarse
+overlay = abrir_segen(app, frame)
+pdf_btn_c = overlay.first.get_by_role("button", name=re.compile("Descargar PDF", re.I))
+assert pdf_btn_c.count() == 0, f"En modo creacion la accion de Descargar PDF no deberia mostrarse, se encontraron {pdf_btn_c.count()} boton(es)"
+capturar_paso(app, "escenario_c_sin_boton_pdf_en_creacion", paso_excel=3)
+overlay.first.locator("button", has_text="Cancelar").click(force=True)
+app.wait_for_timeout(800)
+'''
+
+CUERPOS_REALES["CP051"] = '''
+app, frame = abrir_adsoltra(page, paso_excel=1)
+
+# Escenario A: orden real 3365694 (rol_actual=EXPLRECAU, distinto del
+# rol de la sesion DACD) -> modo consulta
+buscar_y_seleccionar_orden(app, frame, "3365694", tipo_orden="SEGEN = Solicitudes Especiales")
+frame.locator("button", has_text=re.compile("Consultar|Modificar")).first.click(force=True)
+app.wait_for_timeout(3000)
+modal = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile("Solicitud Especial")).last
+
+for campo in ["segNumeroCliente", "segTipoOrden", "segTema", "segTrabajo", "segClase", "segUsuarioDestino"]:
+    assert not modal.locator(f"#{campo}").is_enabled(), f"El panel {campo} deberia estar deshabilitado en modo consulta"
+assert not modal.get_by_role("button", name=re.compile("^Enviar$", re.I)).first.is_enabled(), "Enviar deberia estar deshabilitado en modo consulta"
+assert not modal.get_by_role("button", name=re.compile("^Finalizar$", re.I)).first.is_enabled(), "Finalizar deberia estar deshabilitado en modo consulta"
+pdf_btn = modal.get_by_role("button", name=re.compile("Descargar PDF", re.I))
+for _ in range(15):
+    if pdf_btn.count() and pdf_btn.first.is_enabled():
+        break
+    app.wait_for_timeout(500)
+assert pdf_btn.count() and pdf_btn.first.is_enabled(), "Descargar PDF deberia estar habilitado en modo consulta"
+capturar_paso(app, "escenario_a_modo_lectura", paso_excel=3)
+
+modal.get_by_role("button", name=re.compile("Cancelar", re.I)).click(force=True)
+app.wait_for_timeout(1000)
+assert frame.locator("button", has_text="Buscar").count() > 0, "No se volvio a la bandeja tras cerrar el modal"
+capturar_paso(app, "vuelta_a_la_bandeja", paso_excel=4)
+
+# Escenario B: numero de orden inexistente - el sistema informa la
+# situacion (Ventana de Validacion) y la aplicacion sigue funcionando
+try:
+    buscar_y_seleccionar_orden(app, frame, "9999998", tipo_orden="SEGEN = Solicitudes Especiales")
+except PWTimeoutError:
+    pass
+app.wait_for_timeout(1000)
+mensaje = cerrar_dialogo_validacion_si_aparece(app, frame)
+assert mensaje and "No se encontro la orden solicitada" in mensaje, f"Mensaje inesperado para orden inexistente: {mensaje!r}"
+capturar_paso(app, "escenario_b_orden_inexistente", paso_excel=5)
+assert frame.locator("button", has_text="Buscar").count() > 0, "La aplicacion deberia seguir en ejecucion tras la orden inexistente"
+'''
+
+CUERPOS_REALES["CP052"] = '''
+app, frame = abrir_adsoltra(page, paso_excel=1)
+
+
+def _modificar_y_enviar(numero_orden, texto_observacion, paso_excel_base):
+    buscar_y_seleccionar_orden(app, frame, numero_orden, tipo_orden="SEGEN = Solicitudes Especiales")
+    frame.locator("button", has_text=re.compile("Consultar|Modificar")).first.click(force=True)
+    app.wait_for_timeout(3000)
+    modal = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile("Solicitud Especial")).last
+    assert modal.locator("#segUsuarioDestino").is_editable(), f"Usuario Destino deberia ser editable en modo modificacion (orden {numero_orden})"
+    assert modal.locator("textarea").last.is_editable(), f"La observacion deberia ser editable en modo modificacion (orden {numero_orden})"
+    assert modal.get_by_role("button", name=re.compile("^Enviar$", re.I)).first.is_enabled(), f"Enviar deberia estar habilitado en modo modificacion (orden {numero_orden})"
+    assert modal.get_by_role("button", name=re.compile("^Finalizar$", re.I)).first.is_enabled(), f"Finalizar deberia estar habilitado en modo modificacion (orden {numero_orden})"
+    capturar_paso(app, f"orden_{numero_orden}_modo_modificacion", paso_excel=paso_excel_base)
+
+    buscador = abrir_buscador_usuario_destino(app, frame, modal)
+    fila = buscador.locator("tr.sm-fila", has_text="EPSG")
+    for _ in range(6):
+        if fila.count():
+            break
+        sgtes = buscador.get_by_role("button", name=re.compile("Sgtes", re.I))
+        if sgtes.count() and sgtes.is_enabled():
+            sgtes.click(force=True)
+            app.wait_for_timeout(1200)
+            fila = buscador.locator("tr.sm-fila", has_text="EPSG")
+        else:
+            break
+    if fila.count():
+        fila.first.click(force=True)
+        buscador.get_by_role("button", name=re.compile("^Seleccionar$", re.I)).click(force=True)
+        app.wait_for_timeout(1000)
+    else:
+        buscador.get_by_role("button", name=re.compile("^Cancelar$", re.I)).click(force=True)
+        app.wait_for_timeout(800)
+        modal.locator("#segUsuarioDestino").fill("EPSG")
+    capturar_paso(app, f"orden_{numero_orden}_usuario_destino_alternativo", paso_excel=paso_excel_base + 1)
+
+    # Gotcha real confirmado en vivo 10/11/2026: cualquier accion que le
+    # quite el foco al textarea de observacion ANTES de clickear Enviar
+    # (un .press("Tab") explicito, o incluso un capturar_paso() de por
+    # medio - su screenshot es full_page=True y ese scroll tambien hace
+    # blur) dispara una validacion en segundo plano que deja un overlay
+    # de carga (.seg-overlay) tapando el boton Enviar de forma
+    # persistente en este contexto (headless + slowmo). Por eso el
+    # fill() y el click a Enviar van seguidos, SIN ningun paso intermedio.
+    # Gotcha real confirmado en vivo 10/11/2026: un div .seg-overlay
+    # (loading propio del formulario SEGEN) queda tapando el boton
+    # Enviar en este flujo de MODIFICAR (no en el de CREAR) - un
+    # click(force=True) de Playwright sigue despachando el evento en
+    # las coordenadas del boton, pero el navegador se lo entrega al
+    # elemento que esta FISICAMENTE encima en ese pixel (el overlay),
+    # asi que nunca llega ningun request al backend (confirmado: 0
+    # respuestas de red capturadas tras el click). Fix: invocar
+    # el.click() directo via evaluate(), que llama al handler de
+    # Angular sin pasar por el hit-testing visual del navegador.
+    modal.locator("textarea").last.fill(texto_observacion)
+    modal.get_by_role("button", name=re.compile("^Enviar$", re.I)).evaluate("el => el.click()")
+    app.wait_for_timeout(3000)
+    mensaje = cerrar_dialogo_validacion_si_aparece(app, frame, timeout_ms=8000)
+    assert mensaje and f"La Orden Numero: {numero_orden} ha sido enviada." in mensaje, f"Mensaje de confirmacion inesperado para la orden {numero_orden}: {mensaje!r}"
+    capturar_paso(app, f"orden_{numero_orden}_enviada", paso_excel=paso_excel_base + 2)
+
+
+# Escenario A: orden real 3365695 en estado Requerimiento (RQ), rol_actual=DACD via UPDATE directo
+_modificar_y_enviar("3365695", "PRUEBA SEGEN CP052 - escenario A (Requerimiento)", paso_excel_base=2)
+
+# Escenario B (repeticion, paso 6 de la matriz): orden real 43796 en
+# estado Devolucion (DV), con rol receptor=DACD de forma nativa (sin
+# necesitar UPDATE). NOTA: no se encontro ninguna orden real en estado
+# Ejecucion (EJ) en el ambiente de Pruebas para repetir ese 3er
+# escenario - la unica forma de confirmarlo seria con la consulta
+# pesada de "Todas las Ordenes" (2.3M filas, intermitente/timeout
+# confirmado en vivo) o un insert temporal adicional.
+_modificar_y_enviar("43796", "PRUEBA SEGEN CP052 - escenario B (Devolucion)", paso_excel_base=6)
+'''
+
+CUERPOS_REALES["CP053"] = '''
+app, frame = abrir_adsoltra(page, paso_excel=1)
+
+# Escenario A: orden real 3365695 (RQ, rol_actual=DACD via UPDATE) -
+# finalizar de verdad (Aceptar). Mismo gotcha del .seg-overlay que
+# CP052: click de Finalizar via evaluate(), no via Playwright click normal.
+buscar_y_seleccionar_orden(app, frame, "3365695", tipo_orden="SEGEN = Solicitudes Especiales")
+frame.locator("button", has_text=re.compile("Consultar|Modificar")).first.click(force=True)
+app.wait_for_timeout(3000)
+modal_a = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile("Solicitud Especial")).last
+boton_finalizar_a = modal_a.get_by_role("button", name=re.compile("^Finalizar$", re.I))
+for _ in range(15):
+    if boton_finalizar_a.count() and boton_finalizar_a.first.is_enabled():
+        break
+    app.wait_for_timeout(500)
+assert boton_finalizar_a.count() and boton_finalizar_a.first.is_enabled(), "Finalizar deberia estar habilitado en modo modificacion"
+
+# Reintento sobre el flujo completo Finalizar->confirmacion->Aceptar:
+# gotcha ya conocido (ver CP042/043) de 'Error de Servicio: Error al
+# consultar las ordenes de la bandeja' intermitente - confirmado en
+# vivo 10/11/2026 que tambien aparece en el refresco posterior a
+# finalizar un SEGEN, no solo en el de un EXTRAC.
+mensaje_a = None
+for _intento in range(6):
+    modal_a.get_by_role("button", name=re.compile("^Finalizar$", re.I)).evaluate("el => el.click()")
+    app.wait_for_timeout(2000)
+    error_servicio_a = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile("Error de Servicio"))
+    if error_servicio_a.count() and error_servicio_a.last.is_visible():
+        error_servicio_a.last.get_by_role("button", name=re.compile("Cancelar", re.I)).click(force=True)
+        app.wait_for_timeout(2000)
+        continue
+    confirmacion_a = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile("Confirmaci.n SEGEN"))
+    assert confirmacion_a.count() and confirmacion_a.last.is_visible(), "No aparecio la confirmacion de Finalizar (Confirmacion SEGEN)"
+    texto_confirmacion_a = confirmacion_a.last.inner_text()
+    assert "Confirmaci" in texto_confirmacion_a and "SEGEN" in texto_confirmacion_a, f"Titulo de confirmacion inesperado: {texto_confirmacion_a!r}"
+    assert "Est" in texto_confirmacion_a and "seguro que desea finalizar el SEGEN" in texto_confirmacion_a, f"Texto de confirmacion inesperado: {texto_confirmacion_a!r}"
+    capturar_paso(app, "confirmacion_finalizar_3365695", paso_excel=3)
+
+    confirmacion_a.last.get_by_role("button", name=re.compile("^Aceptar$", re.I)).click(force=True)
+    app.wait_for_timeout(3000)
+    dlg_resultado_a = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile("Ventana de Validación|Error de Servicio"))
+    if dlg_resultado_a.count() and "Error de Servicio" in dlg_resultado_a.first.inner_text():
+        dlg_resultado_a.first.get_by_role("button", name=re.compile("Cancelar", re.I)).click(force=True)
+        app.wait_for_timeout(2000)
+        continue
+    assert dlg_resultado_a.count() and dlg_resultado_a.first.is_visible(), "No se vio el mensaje de resultado de la finalizacion"
+    mensaje_a = dlg_resultado_a.first.inner_text()
+    assert "3365695" in mensaje_a and "ha sido finalizado correctamente" in mensaje_a, f"Mensaje de finalizacion inesperado: {mensaje_a!r}"
+    dlg_resultado_a.first.get_by_role("button", name=re.compile("Aceptar", re.I)).click(force=True)
+    app.wait_for_timeout(1500)
+    break
+assert mensaje_a is not None, "No se pudo completar la finalizacion tras varios intentos (Error de Servicio persistente)"
+capturar_paso(app, "orden_3365695_finalizada", paso_excel=4)
+
+# Verificacion de bandeja refrescada SIN volver a abrir el modal de
+# Busqueda (gotcha real confirmado en vivo 10/11/2026: justo despues de
+# cerrar los dialogos de Error de Servicio/confirmacion puede quedar un
+# tooltip-popover residual (.cdk-overlay-popover) que intercepta el
+# siguiente click en 'Buscar' - el texto de la grilla ya esta
+# refrescado automaticamente, no hace falta buscar de nuevo).
+texto_bandeja_a = frame.locator("body").inner_text()
+assert "3365695" in texto_bandeja_a and "Finalizacion" in texto_bandeja_a, f"La orden deberia quedar en estado Finalizacion en la bandeja ya refrescada: {texto_bandeja_a[-300:]!r}"
+capturar_paso(app, "orden_3365695_en_bandeja_finalizada", paso_excel=4)
+
+# Escenario B: orden real 43796 (DV, rol_actual=DACD via UPDATE) -
+# cancelar la finalizacion, debe conservar su estado anterior (Devolucion)
+buscar_y_seleccionar_orden(app, frame, "43796", tipo_orden="SEGEN = Solicitudes Especiales")
+frame.locator("button", has_text=re.compile("Consultar|Modificar")).first.click(force=True)
+app.wait_for_timeout(3000)
+modal_b = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile("Solicitud Especial")).last
+modal_b.get_by_role("button", name=re.compile("^Finalizar$", re.I)).evaluate("el => el.click()")
+app.wait_for_timeout(2000)
+confirmacion_b = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile("Confirmaci.n SEGEN"))
+assert confirmacion_b.count() and confirmacion_b.last.is_visible(), "No aparecio la confirmacion de Finalizar para la orden 43796"
+capturar_paso(app, "confirmacion_finalizar_43796", paso_excel=3)
+confirmacion_b.last.get_by_role("button", name=re.compile("^Cancelar$", re.I)).click(force=True)
+app.wait_for_timeout(1500)
+
+assert modal_b.get_by_role("button", name=re.compile("^Enviar$", re.I)).first.is_enabled(), "Tras cancelar la finalizacion deberia seguir en modo modificacion (Enviar habilitado)"
+capturar_paso(app, "orden_43796_sigue_en_modificacion", paso_excel=5)
+modal_b.get_by_role("button", name=re.compile("^Cancelar$", re.I)).click(force=True)
+app.wait_for_timeout(1000)
+
+texto_bandeja_b = frame.locator("body").inner_text()
+assert "43796" in texto_bandeja_b and "Devolucion" in texto_bandeja_b, f"La orden 43796 deberia conservar su estado anterior (Devolucion) tras cancelar: {texto_bandeja_b[-300:]!r}"
+capturar_paso(app, "orden_43796_conserva_estado_devolucion", paso_excel=5)
+'''
+
+CUERPOS_REALES["CP054"] = '''
+app, frame = abrir_adsoltra(page, paso_excel=1)
+
+# Orden real 43796 (DV, rol_actual=DACD), ya tiene 3 observaciones
+# previas reales acumuladas en sus movimientos (confirmado en vivo:
+# 2 historicas de 2002 + 1 de la prueba de CP052).
+buscar_y_seleccionar_orden(app, frame, "43796", tipo_orden="SEGEN = Solicitudes Especiales")
+frame.locator("button", has_text=re.compile("Consultar|Modificar")).first.click(force=True)
+app.wait_for_timeout(3000)
+modal = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile("Solicitud Especial")).last
+
+observaciones_previas = modal.locator("textarea").first
+assert not observaciones_previas.is_editable(), "Las observaciones previas deberian estar en modo lectura (no editables)"
+texto_previas = observaciones_previas.input_value()
+assert texto_previas.count("\\n") >= 1, f"Las observaciones previas deberian verse acumuladas (varios movimientos): {texto_previas!r}"
+capturar_paso(app, "observaciones_previas_acumuladas_solo_lectura", paso_excel=2)
+
+# Paso 3: Enter no debe incorporar salto de linea en la observacion nueva
+observacion_nueva = modal.locator("textarea").last
+observacion_nueva.fill("")
+observacion_nueva.type("Texto de Prueba 123", delay=30)
+observacion_nueva.press("Enter")
+observacion_nueva.type(" - sin salto de linea", delay=30)
+valor_tras_enter = observacion_nueva.input_value()
+assert "\\n" not in valor_tras_enter, f"Enter no deberia incorporar un salto de linea en la observacion nueva: {valor_tras_enter!r}"
+capturar_paso(app, "enter_no_agrega_salto_de_linea", paso_excel=3)
+
+# Paso 4: Enviar con la observacion mezclando mayusculas y minusculas
+observacion_nueva.fill("Texto de Prueba 123")
+modal.get_by_role("button", name=re.compile("^Enviar$", re.I)).evaluate("el => el.click()")
+app.wait_for_timeout(3000)
+mensaje = cerrar_dialogo_validacion_si_aparece(app, frame, timeout_ms=8000)
+assert mensaje and "43796" in mensaje and "ha sido enviada" in mensaje, f"Mensaje de confirmacion inesperado: {mensaje!r}"
+capturar_paso(app, "envio_con_observacion_mixta", paso_excel=4)
+
+# Paso 5: reabrir y verificar que el movimiento conserva mayus/minus,
+# sin saltos de linea, dentro de las observaciones acumuladas
+buscar_y_seleccionar_orden(app, frame, "43796", tipo_orden="SEGEN = Solicitudes Especiales")
+frame.locator("button", has_text=re.compile("Consultar|Modificar")).first.click(force=True)
+app.wait_for_timeout(3000)
+modal2 = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile("Solicitud Especial")).last
+texto_previas_2 = modal2.locator("textarea").first.input_value()
+assert "Texto de Prueba 123" in texto_previas_2, f"La observacion deberia conservar mayusculas/minusculas tal como se ingreso (sin convertirse a mayusculas): {texto_previas_2!r}"
+capturar_paso(app, "movimiento_conserva_mayus_minus", paso_excel=5)
+
+# Paso 6: repetir el envio dejando la observacion vacia
+modal2.locator("textarea").last.fill("")
+modal2.get_by_role("button", name=re.compile("^Enviar$", re.I)).evaluate("el => el.click()")
+app.wait_for_timeout(3000)
+mensaje2 = cerrar_dialogo_validacion_si_aparece(app, frame, timeout_ms=8000)
+assert mensaje2 and "43796" in mensaje2 and "ha sido enviada" in mensaje2, f"Mensaje de confirmacion inesperado (observacion vacia): {mensaje2!r}"
+capturar_paso(app, "envio_con_observacion_vacia", paso_excel=6)
+'''
+
+CUERPOS_REALES["CP060"] = '''
+app, frame = abrir_adsoltra(page, paso_excel=1)
+overlay = abrir_segen(app, frame)
+
+# Paso 1-3: buscador de Usuario Destino, rol de 1 caracter ('*', tipo F,
+# area asignada manualmente para destrabar el caso - ver
+# casos_fallidos_confirmados.json H002). Se recorre con Sgtes hasta
+# encontrarlo (no esta garantizado en la primera pagina).
+buscador_rol = abrir_buscador_usuario_destino(app, frame, overlay)
+fila_rol = buscador_rol.locator("tr.sm-fila", has_text=re.compile(r"^\\*"))
+for _ in range(60):
+    if fila_rol.count():
+        break
+    sgtes = buscador_rol.get_by_role("button", name=re.compile("Sgtes", re.I))
+    if not sgtes.is_enabled():
+        break
+    sgtes.click(force=True)
+    app.wait_for_timeout(700)
+    fila_rol = buscador_rol.locator("tr.sm-fila", has_text=re.compile(r"^\\*"))
+assert fila_rol.count(), "No se encontro el rol '*' en el buscador de Usuario Destino"
+capturar_paso(app, "rol_1_caracter_encontrado", paso_excel=2)
+fila_rol.first.locator("td").first.click()
+buscador_rol.get_by_role("button", name=re.compile("^Seleccionar$", re.I)).click(force=True)
+app.wait_for_timeout(1000)
+assert not buscador_rol.first.is_visible(), "El buscador deberia cerrarse tras Seleccionar"
+valor_rol = overlay.first.locator("#segUsuarioDestino").input_value()
+assert valor_rol == "0*", f"El rol de 1 caracter deberia normalizarse a dos caracteres ('0*'): {valor_rol!r}"
+capturar_paso(app, "rol_normalizado_a_dos_caracteres", paso_excel=3)
+
+# Paso 4: repetir desde el campo Nro. Cliente (segundo boton "...")
+buscador_cliente = abrir_buscador_dinamico(app, frame, "Consultar Cliente", 1, overlay)
+fila_cliente = buscador_cliente.locator("tr.sm-fila").first
+assert fila_cliente.count(), "No se encontraron resultados en el buscador de Cliente"
+numero_cliente_esperado = fila_cliente.locator("td").first.inner_text().strip()
+fila_cliente.locator("td").first.click()
+buscador_cliente.get_by_role("button", name=re.compile("^Seleccionar$", re.I)).click(force=True)
+app.wait_for_timeout(1000)
+assert not buscador_cliente.first.is_visible(), "El buscador de Cliente deberia cerrarse tras Seleccionar"
+valor_cliente = overlay.first.locator("#segNumeroCliente").input_value()
+assert valor_cliente == numero_cliente_esperado, f"El campo deberia recibir el numero de cliente de la fila seleccionada ({numero_cliente_esperado!r}): {valor_cliente!r}"
+capturar_paso(app, "numero_cliente_recibido", paso_excel=4)
+'''
+
 CUERPOS_REALES["CP049"] = '''
 app, frame = abrir_adsoltra(page, paso_excel=1)
 
@@ -1740,6 +2301,66 @@ assert mensaje_b and "Debe de seleccionar un rol destino válido." in mensaje_b,
 capturar_paso(app, "escenario_b_rol_invalido", paso_excel=2)
 overlay.first.locator("button", has_text="Cancelar").click(force=True)
 app.wait_for_timeout(1000)
+'''
+
+CUERPOS_REALES["CP030"] = '''
+app, frame = abrir_adsoltra(page, paso_excel=1)
+buscar_y_seleccionar_orden(app, frame, "40006337", tipo_orden="SEGEN = Solicitudes Especiales")
+historial = abrir_historial_de_orden(app, frame)
+capturar_paso(app, "historial_abierto", paso_excel=1)
+
+# Correlativo 0000002: texto_envio IS NULL en acl_orden_flujo (confirmado
+# por SQL directo: SELECT f.corr_flujo, f.texto_envio FROM acl_orden_flujo
+# f WHERE f.empresa='7' AND f.numero_orden=40006337 AND f.texto_envio IS NULL).
+# El mensaje "No existen observaciones" NO aparece dentro del panel inline
+# (.his-obs-box, que queda vacio) sino en una "Ventana de Validacion"
+# aparte (overlay hermano del modal de Historial) - gotcha confirmado en
+# vivo 09/11/2026 tras una corrida previa que lo paso por alto mirando
+# solo el texto del modal de Historial.
+fila = historial.first.locator("tr.his-fila", has_text="0000002")
+fila.first.locator("td").first.click()
+app.wait_for_timeout(1500)
+capturar_paso(app, "tras_seleccionar_correlativo_0000002", paso_excel=3)
+mensaje_dialogo = cerrar_dialogo_validacion_si_aparece(app, frame)
+assert mensaje_dialogo is not None and "No existen observaciones" in mensaje_dialogo, f"Se esperaba la 'Ventana de Validacion' con 'No existen observaciones' para el correlativo 0000002 (texto_envio NULL) de la orden 40006337: {mensaje_dialogo!r}"
+capturar_paso(app, "mensaje_no_existen_observaciones", paso_excel=4)
+historial.first.get_by_role("button", name=re.compile("^Cancelar$", re.I)).click(force=True)
+app.wait_for_timeout(800)
+'''
+
+CUERPOS_REALES["CP040"] = '''
+app, frame = abrir_adsoltra(page, paso_excel=1)
+# Orden 500007 vuelta a RQ con UPDATE directo (estaba en Finalizacion
+# por el run de CP043) para cumplir la precondicion real de CP040 (orden
+# EXTRAC NO finalizada con adjunto registrado) - no hay ninguna orden
+# EXTRAC no finalizada nativa en todo el ambiente de Pruebas (ver
+# casos_fallidos_confirmados.json, 0 EXTRAC en Pendientes/Devueltas/Anuladas).
+buscar_y_seleccionar_orden(app, frame, "500007")
+frame.locator("button", has_text="Consultar/Modificar").first.click()
+app.wait_for_timeout(2500)
+extractor = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile("Extractor")).last
+assert extractor.count() and extractor.first.is_visible(), "No se abrio el Extractor de la orden de prueba"
+capturar_paso(app, "extractor_no_finalizado", paso_excel=2)
+
+boton_guardar = extractor.first.get_by_role("button", name=re.compile(r"^\\s*Guardar\\s*$", re.I))
+assert boton_guardar.count(), "No se encontro el boton Guardar (accion de obtencion del adjunto, paso 3 de la matriz)"
+try:
+    with app.expect_download(timeout=15000) as descarga_info:
+        boton_guardar.first.click(force=True)
+    capturar_paso(app, "descarga_confirmada", paso_excel=4)
+    assert False, f"INESPERADO: la descarga SI se completo ({descarga_info.value.suggested_filename}) - revisar si el defecto de CP043 (retiro de adjunto) se corrigio"
+except PWTimeoutError:
+    mensaje_dialogo = cerrar_dialogo_validacion_si_aparece(app, frame)
+    capturar_paso(app, "guardar_sin_descarga", paso_excel=4)
+    # PENDIENTE DE REPORTAR A DESARROLLO (mismo defecto de fondo que
+    # CP043): el boton Guardar SI es la accion real de descarga (confirmado
+    # en vivo 10/11/2026 con la orden 500007 en estado RQ), pero el backend
+    # no logra servir el archivo - mismo problema sistemico del servicio
+    # de repositorio de adjuntos, visto ahora desde el lado de la descarga.
+    assert mensaje_dialogo is not None and "No existen" not in mensaje_dialogo, f"Se esperaba una descarga exitosa (paso 4-5 de la matriz), pero Guardar no descargo nada: {mensaje_dialogo!r}"
+    assert False, f"El archivo NO se descarga: {mensaje_dialogo!r} - mismo defecto sistemico de repositorio de adjuntos que CP043"
+extractor.first.locator("button", has_text="Cancelar").click(force=True)
+app.wait_for_timeout(800)
 '''
 
 _CPS_TODOS = sorted(MATRIZ, key=lambda x: int(x[2:]))

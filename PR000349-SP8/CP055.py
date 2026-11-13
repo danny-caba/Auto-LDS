@@ -1012,7 +1012,75 @@ def main():
         _CASO_OK = False
         try:
             login(page, paso_excel=1)
-            raise NotImplementedError('CP055 (RF-06 - Descarga del documento de la solicitud): falta escribir el body real - falta exploracion en vivo o dato real.')
+            from pypdf import PdfReader
+
+            app, frame = abrir_adsoltra(page, paso_excel=1)
+
+            # Escenario A: modo consulta (orden real 3365694, rol_actual=EXPLRECAU
+            # distinto del rol de la sesion DACD -> abre en solo lectura)
+            buscar_y_seleccionar_orden(app, frame, "3365694", tipo_orden="SEGEN = Solicitudes Especiales")
+            frame.locator("button", has_text=re.compile("Consultar|Modificar")).first.click(force=True)
+            app.wait_for_timeout(3000)
+            modal_a = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile("Solicitud Especial")).last
+            assert not modal_a.get_by_role("button", name=re.compile("^Enviar$", re.I)).first.is_enabled(), "En modo consulta Enviar deberia estar deshabilitado"
+            assert not modal_a.get_by_role("button", name=re.compile("^Finalizar$", re.I)).first.is_enabled(), "En modo consulta Finalizar deberia estar deshabilitado"
+            pdf_btn_a = modal_a.get_by_role("button", name=re.compile("Descargar PDF", re.I))
+            for _ in range(15):
+                if pdf_btn_a.count() and pdf_btn_a.first.is_enabled():
+                    break
+                app.wait_for_timeout(500)
+            assert pdf_btn_a.count() and pdf_btn_a.first.is_enabled(), "En modo consulta Descargar PDF deberia estar habilitado"
+            capturar_paso(app, "escenario_a_modo_consulta", paso_excel=1)
+
+            with app.expect_download(timeout=20000) as descarga_info_a:
+                pdf_btn_a.first.click(force=True)
+            ruta_pdf_a = EVIDENCIA / "CP055_consulta_3365694.pdf"
+            descarga_info_a.value.save_as(ruta_pdf_a)
+            texto_pdf_a = "\n".join(p.extract_text() for p in PdfReader(str(ruta_pdf_a)).pages)
+            assert "3365694" in texto_pdf_a, f"El PDF deberia incluir el numero de orden: {texto_pdf_a!r}"
+            assert "508904" in texto_pdf_a, f"El PDF deberia incluir el numero de cliente: {texto_pdf_a!r}"
+            assert "EXPLRECAU" in texto_pdf_a, f"El PDF deberia incluir el ejecutor (rol actual): {texto_pdf_a!r}"
+            assert "020906" in texto_pdf_a, f"El PDF deberia incluir el trabajo: {texto_pdf_a!r}"
+            assert "Fecha Impresi" in texto_pdf_a, f"El PDF deberia incluir la fecha de impresion: {texto_pdf_a!r}"
+            capturar_paso(app, "pdf_descargado_modo_consulta", paso_excel=1)
+            modal_a.get_by_role("button", name=re.compile("Cancelar", re.I)).click(force=True)
+            app.wait_for_timeout(1000)
+
+            # Escenario B: modo modificacion (orden real 3365695, rol_actual=DACD
+            # tras UPDATE directo - mismo rol que la sesion, confirmado en vivo
+            # 10/11/2026 que abre con Enviar/Finalizar habilitados y campos editables)
+            buscar_y_seleccionar_orden(app, frame, "3365695", tipo_orden="SEGEN = Solicitudes Especiales")
+            frame.locator("button", has_text=re.compile("Consultar|Modificar")).first.click(force=True)
+            app.wait_for_timeout(3000)
+            modal_b = frame.locator(".ant-modal, nz-modal-container").filter(has_text=re.compile("Solicitud Especial")).last
+            assert modal_b.get_by_role("button", name=re.compile("^Enviar$", re.I)).first.is_enabled(), "En modo modificacion Enviar deberia estar habilitado"
+            assert modal_b.get_by_role("button", name=re.compile("^Finalizar$", re.I)).first.is_enabled(), "En modo modificacion Finalizar deberia estar habilitado"
+            pdf_btn_b = modal_b.get_by_role("button", name=re.compile("Descargar PDF", re.I))
+            for _ in range(15):
+                if pdf_btn_b.count() and pdf_btn_b.first.is_enabled():
+                    break
+                app.wait_for_timeout(500)
+            assert pdf_btn_b.count() and pdf_btn_b.first.is_enabled(), "En modo modificacion Descargar PDF deberia estar habilitado"
+            capturar_paso(app, "escenario_b_modo_modificacion", paso_excel=2)
+
+            with app.expect_download(timeout=20000) as descarga_info_b:
+                pdf_btn_b.first.click(force=True)
+            ruta_pdf_b = EVIDENCIA / "CP055_modificacion_3365695.pdf"
+            descarga_info_b.value.save_as(ruta_pdf_b)
+            texto_pdf_b = "\n".join(p.extract_text() for p in PdfReader(str(ruta_pdf_b)).pages)
+            assert "3365695" in texto_pdf_b, f"El PDF deberia incluir el numero de orden: {texto_pdf_b!r}"
+            assert "468322" in texto_pdf_b, f"El PDF deberia incluir el numero de cliente: {texto_pdf_b!r}"
+            capturar_paso(app, "pdf_descargado_modo_modificacion", paso_excel=2)
+            modal_b.get_by_role("button", name=re.compile("Cancelar", re.I)).click(force=True)
+            app.wait_for_timeout(1000)
+
+            # Escenario C: modo creacion (SEGEN) - la accion no deberia mostrarse
+            overlay = abrir_segen(app, frame)
+            pdf_btn_c = overlay.first.get_by_role("button", name=re.compile("Descargar PDF", re.I))
+            assert pdf_btn_c.count() == 0, f"En modo creacion la accion de Descargar PDF no deberia mostrarse, se encontraron {pdf_btn_c.count()} boton(es)"
+            capturar_paso(app, "escenario_c_sin_boton_pdf_en_creacion", paso_excel=3)
+            overlay.first.locator("button", has_text="Cancelar").click(force=True)
+            app.wait_for_timeout(800)
 
             capturar_paso(app, "estado_final_del_caso", paso_excel=max(_parsear_pasos_excel(PASOS_CASO), default=None))
             _CASO_OK = True

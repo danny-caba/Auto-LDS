@@ -1012,7 +1012,28 @@ def main():
         _CASO_OK = False
         try:
             login(page, paso_excel=1)
-            raise NotImplementedError('CP030 (RF-03 - Movimiento cuya observación no es devuelta por la consulta): falta escribir el body real - falta exploracion en vivo o dato real.')
+            app, frame = abrir_adsoltra(page, paso_excel=1)
+            buscar_y_seleccionar_orden(app, frame, "40006337", tipo_orden="SEGEN = Solicitudes Especiales")
+            historial = abrir_historial_de_orden(app, frame)
+            capturar_paso(app, "historial_abierto", paso_excel=1)
+
+            # Correlativo 0000002: texto_envio IS NULL en acl_orden_flujo (confirmado
+            # por SQL directo: SELECT f.corr_flujo, f.texto_envio FROM acl_orden_flujo
+            # f WHERE f.empresa='7' AND f.numero_orden=40006337 AND f.texto_envio IS NULL).
+            # El mensaje "No existen observaciones" NO aparece dentro del panel inline
+            # (.his-obs-box, que queda vacio) sino en una "Ventana de Validacion"
+            # aparte (overlay hermano del modal de Historial) - gotcha confirmado en
+            # vivo 09/11/2026 tras una corrida previa que lo paso por alto mirando
+            # solo el texto del modal de Historial.
+            fila = historial.first.locator("tr.his-fila", has_text="0000002")
+            fila.first.locator("td").first.click()
+            app.wait_for_timeout(1500)
+            capturar_paso(app, "tras_seleccionar_correlativo_0000002", paso_excel=3)
+            mensaje_dialogo = cerrar_dialogo_validacion_si_aparece(app, frame)
+            assert mensaje_dialogo is not None and "No existen observaciones" in mensaje_dialogo, f"Se esperaba la 'Ventana de Validacion' con 'No existen observaciones' para el correlativo 0000002 (texto_envio NULL) de la orden 40006337: {mensaje_dialogo!r}"
+            capturar_paso(app, "mensaje_no_existen_observaciones", paso_excel=4)
+            historial.first.get_by_role("button", name=re.compile("^Cancelar$", re.I)).click(force=True)
+            app.wait_for_timeout(800)
 
             capturar_paso(app, "estado_final_del_caso", paso_excel=max(_parsear_pasos_excel(PASOS_CASO), default=None))
             _CASO_OK = True

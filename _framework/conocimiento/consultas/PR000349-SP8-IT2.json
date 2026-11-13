@@ -1,0 +1,44 @@
+{
+  "requerimiento": "PR000349-SP8-IT2",
+  "fecha": "2026-11-11T21:58:11.460435",
+  "entradas_consultadas": [
+    "CONO-0001",
+    "CONO-0002",
+    "CONO-0007",
+    "CONO-0008",
+    "CONO-0009",
+    "CONO-0010",
+    "CONO-0011",
+    "CONO-0012",
+    "CONO-0013",
+    "CONO-0014",
+    "CONO-0015",
+    "CONO-0016",
+    "CONO-0017",
+    "CONO-0018",
+    "CONO-0019",
+    "CONO-0020",
+    "CONO-0021"
+  ],
+  "entradas_aplicadas": [
+    "CONO-0010",
+    "CONO-0011",
+    "CONO-0012",
+    "CONO-0013",
+    "CONO-0014",
+    "CONO-0015",
+    "CONO-0016",
+    "CONO-0018",
+    "CONO-0021"
+  ],
+  "entradas_descartadas": {
+    "CONO-0001": "pagina de juguete local (consulta-producto-local), no aplica a Web LDS real",
+    "CONO-0002": "entrada de prueba para validar el mecanismo de invalidacion, no es conocimiento real",
+    "CONO-0007": "dato de prueba especifico de la pantalla Informacion General (modulo atencion-integral-informacion-general), no relacionado con ADSOLTRA/SEGEN",
+    "CONO-0008": "especifico de la pantalla Atencion Integral, modulo distinto",
+    "CONO-0009": "ruta de menu especifica de Informacion General, modulo distinto",
+    "CONO-0017": "multi-sucursal: no hay indicio de que ADSOLTRA/SEGEN use seleccion de sucursal (no se encontro en el EF/MCP de SP8 revisado)",
+    "CONO-0019": "tablas de Synergia Reclamos, modulo distinto sin relacion con ADSOLTRA/SEGEN",
+    "CONO-0020": "hallazgo especifico del modulo MAC (Atencion Integral MAC), no aplica"
+  }
+}

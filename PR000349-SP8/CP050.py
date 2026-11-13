@@ -1012,7 +1012,66 @@ def main():
         _CASO_OK = False
         try:
             login(page, paso_excel=1)
-            raise NotImplementedError('CP050 (RF-06 - Carga de datos del cliente): falta escribir el body real - falta exploracion en vivo o dato real.')
+            app, frame = abrir_adsoltra(page, paso_excel=1)
+            overlay = abrir_segen(app, frame)
+            opciones_tipo = overlay.first.locator("#segTipoOrden option")
+            for _ in range(20):
+                if opciones_tipo.count() > 1:
+                    break
+                app.wait_for_timeout(300)
+            overlay.first.locator("#segTipoOrden").select_option(label="AC = ATENCION COMERCIAL")
+            app.wait_for_timeout(500)
+
+            # Paso 2-3: cliente existente con medidor instalado (orden real 500007)
+            overlay.first.locator("#segNumeroCliente").fill("1391305")
+            overlay.first.locator("#segNumeroCliente").press("Tab")
+            app.wait_for_timeout(2000)
+            nombre = overlay.first.locator("#segNombreCliente").input_value()
+            alimentador = overlay.first.locator("#segAlimentador").input_value()
+            ruta = overlay.first.locator("#segRuta").input_value()
+            llave = overlay.first.locator("#segLlave").input_value()
+            texto_overlay = overlay.first.inner_text()
+            assert nombre == "CORTEZ SANCHEZ DE ARRIAGA IRMA ELIZABETH", f"Nombre inesperado: {nombre!r}"
+            assert "CALLE D MARGEN IZQ. KM 29" in texto_overlay and "CIENEGUILLA" in texto_overlay, f"Direccion/comuna no se cargaron: {texto_overlay[-400:]!r}"
+            assert alimentador == "MA - 41", f"Alimentador inesperado: {alimentador!r}"
+            assert ruta == "019 - 831 - 0800", f"Ruta inesperada: {ruta!r}"
+            assert llave == "A11407 - 4", f"Llave inesperada: {llave!r}"
+            assert "6034669" in texto_overlay and "ABB" in texto_overlay, f"Medidor instalado no se cargo: {texto_overlay[-400:]!r}"
+            capturar_paso(app, "datos_cliente_cargados", paso_excel=3)
+
+            # Paso 4: cliente inexistente - mensaje y limpieza
+            overlay.first.locator("#segNumeroCliente").fill("9999999999")
+            overlay.first.locator("#segNumeroCliente").press("Tab")
+            app.wait_for_timeout(2000)
+            mensaje = cerrar_dialogo_validacion_si_aparece(app, frame)
+            assert mensaje and "El cliente N\u00b0 9999999999 no existe" in mensaje, f"Mensaje inesperado para cliente inexistente: {mensaje!r}"
+            nombre_tras_inexistente = overlay.first.locator("#segNombreCliente").input_value()
+            alimentador_tras_inexistente = overlay.first.locator("#segAlimentador").input_value()
+            assert nombre_tras_inexistente == "", f"El nombre deberia quedar vacio con un cliente inexistente: {nombre_tras_inexistente!r}"
+            assert alimentador_tras_inexistente == "", f"El alimentador deberia quedar vacio con un cliente inexistente: {alimentador_tras_inexistente!r}"
+            capturar_paso(app, "cliente_inexistente_datos_limpios", paso_excel=4)
+
+            # Paso 5: primer cliente otra vez, despues un SEGUNDO cliente valido
+            # distinto - los datos (incluidos medidores) deben limpiarse/reemplazarse
+            overlay.first.locator("#segNumeroCliente").fill("1391305")
+            overlay.first.locator("#segNumeroCliente").press("Tab")
+            app.wait_for_timeout(2000)
+            assert overlay.first.locator("#segNombreCliente").input_value() == "CORTEZ SANCHEZ DE ARRIAGA IRMA ELIZABETH", "No se recargo el primer cliente"
+
+            overlay.first.locator("#segNumeroCliente").fill("508904")
+            overlay.first.locator("#segNumeroCliente").press("Tab")
+            app.wait_for_timeout(2000)
+            nombre2 = overlay.first.locator("#segNombreCliente").input_value()
+            alimentador2 = overlay.first.locator("#segAlimentador").input_value()
+            ruta2 = overlay.first.locator("#segRuta").input_value()
+            llave2 = overlay.first.locator("#segLlave").input_value()
+            texto_overlay2 = overlay.first.inner_text()
+            assert nombre2 == "NUÑEZ VILCA VDA DE GAMARRA EMILIA", f"No se cargo el segundo cliente: {nombre2!r}"
+            assert alimentador2 == "SM - 11", f"Alimentador del segundo cliente inesperado: {alimentador2!r}"
+            assert ruta2 == "019 - 902 - 1000", f"Ruta del segundo cliente inesperada: {ruta2!r}"
+            assert llave2 == "A10145 - 2", f"Llave del segundo cliente inesperada: {llave2!r}"
+            assert "6034669" not in texto_overlay2 and "MA - 41" not in texto_overlay2, f"Los datos/medidor del primer cliente deberian haberse limpiado al cambiar de cliente: {texto_overlay2[-400:]!r}"
+            capturar_paso(app, "segundo_cliente_reemplaza_datos_anteriores", paso_excel=5)
 
             capturar_paso(app, "estado_final_del_caso", paso_excel=max(_parsear_pasos_excel(PASOS_CASO), default=None))
             _CASO_OK = True
