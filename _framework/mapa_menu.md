@@ -1,0 +1,117 @@
+# Mapa de navegacion Web LDS
+
+Generado desde `Opciones_Menu_Principal.xlsx` (84 filas). Escanear antes de un proyecto nuevo para ver si una pantalla ya se mapeo.
+
+- Administrativo
+  - **Consulta De Cobranza Externa** — PR000349-SP9 (RF-03)
+- Comercial
+  - **Administración De Planes De Encargo** — PR000349-SP6 (RF-01)
+  - **Administración De Tipos De Cambio** — PR000349-SP6 (RF-02)
+  - **Afiliaciones Por Promotores Especiales** — PR000349-SP7 (RF-07)
+  - **Anulacion De Facturas** — PR000349-SP1 (RF-06)
+  - **Aprobación De Informes Dwh** — PR000349-SP1 (RF-10)
+  - **Asignacion De Clientes A Carteras** — PR000349-SP1 (RF-03)
+  - **Asignación De Rutas A Clientes** — PR000349-SP10 (RF-03)
+  - Atención Integral Al Cliente
+    - **Asignacion De Usuarios** — PR000335-SP5 (RF-02)
+    - Atenciones A Clientes
+      - **Consulta De Atenciones Comerciales** — PR000335-SP2 (RF-01, RF-02, RF-03, RF-04); PR000335-SP4 (RF-01, RF-03)
+    - **Listado Pedidos Importantes** — PR000335-SP5 (RF-03)
+    - **Resumen De Pedidos** — PR000335-SP5 (RF-04)
+    - **Seguimiento De Clientes Mt** — PR000335-SP5 (RF-01)
+  - **Auditoria De Afiliaciones** — PR000349-SP7 (RF-01)
+  - **Base Semestral De Medidores** — PR000349-SP9 (RF-05)
+  - **Cambio De Estado De Libros De Corte** — PR000349-SP4 (RF-06)
+  - **Cambio De Sucursal De Clientes** — PR000349-SP10 (RF-04)
+  - **Comisión De Encargos De Cobranza** — PR000349-SP6 (RF-07)
+  - **Consulta De Catastro De Conexiones Eléctricas** — PR000349-SP6 (RF-08)
+  - **Consulta De Clientes Asociados A Una S.S.** — PR000349-SP2 (RF-01)
+  - **Consulta De Cortes Pendientes** — PR000349-SP2 (RF-07)
+  - **Consulta De Cuadratura De Sesion** — PR000349-SP2 (RF-04)
+  - **Consulta De Modificaciones Y Refacturaciones** — PR000349-SP10 (RF-06)
+  - **Consulta De Movimientos De Saldos** — PR000349-SP1 (RF-07)
+  - **Consulta De Proyectos De Encargos** — PR000349-SP7 (RF-03)
+  - **Consulta Generica De Solicitudes De Reposicion** — PR000349-SP2 (RF-09)
+  - **Consulta Y Extraccion De Base Semestral** — PR000349-SP9 (RF-06)
+  - **Emisión De Cartas Masivas** — PR000349-SP1 (RF-05)
+  - **Encargos De Cobranza** — PR000349-SP7 (RF-05)
+  - Facturación
+    - Refacturación
+      - **Traslados De Capital - Órdenes De Refacturación** — PR000325-SP6 (RF-01, RF-02, RF-03, RF-04, RF-05, RF-06, RF-07, RF-08, RF-09, RF-10)
+  - **Informacion Fonavi** — PR000349-SP9 (RF-01)
+  - **Ingreso De Accion Realizada - Ordenes Especiales De Corte** — PR000349-SP4 (RF-03)
+  - **Ingreso De Accion Realizada Para Ordenes De Reposicion** — PR000349-SP4 (RF-04)
+  - **Ingreso De Libros De Corte** — PR000349-SP4 (RF-02)
+  - **Investigacion De Clientes** — PR000349-SP1 (RF-04)
+  - **Listados De Corte Y Reposicion** — PR000349-SP4 (RF-05)
+  - **Listados De Facilidades De Pago Por Deuda De Energía** — PR000349-SP1 (RF-08)
+  - **Listados De Ingresos De Cnr Por Deuda De Servicios** — PR000349-SP1 (RF-09)
+  - **Log De Carga De Datawarehouse** — PR000349-SP1 (RF-12)
+  - **Mantenedor De Inspectores De Corte** — PR000349-SP2 (RF-06)
+  - **Mantenedor De Orden De Pagos** — PR000349-SP9 (RF-02)
+  - **Mantenimiento De Carteras** — PR000349-SP1 (RF-02)
+  - **Mantenimiento De Clientes De Encargos** — PR000349-SP7 (RF-02)
+  - **Mantenimiento De Empleados Con Descuento** — PR000349-SP10 (RF-07)
+  - **Mantenimiento De Informes Dwh** — PR000349-SP1 (RF-11)
+  - **Mantenimiento De Promotores** — PR000349-SP6 (RF-04)
+  - **Mantenimiento De Proyectos De Encargos** — PR000349-SP9 (RF-04)
+  - **Mantenimiento De Seguros De Encargo** — PR000349-SP6 (RF-03)
+  - **Modificacion De Antiguedad De Saldo** — PR000349-SP10 (RF-01)
+  - **Modificacion De Direccion De Reparto** — PR000349-SP10 (RF-09)
+  - **Modificacion De Fecha De Contrato** — PR000349-SP10 (RF-08)
+  - **Niveles De Promotor** — PR000349-SP6 (RF-05)
+  - **Parámetros De Encargo** — PR000349-SP6 (RF-06)
+  - **Promocion De Afiliados** — PR000349-SP7 (RF-06)
+  - Reclamos Comerciales
+    - **Acuerdos Del Reclamo** — PR000326-SP2 (RF-08)
+    - **Asignacion De Reclamos** — PR000326-SP2 (RF-02, RF-09)
+    - **Atención Rápida - Conciliación De Tres Dias** — PR000326-SP2 (RF-04)
+    - **Búsqueda De Reclamos** — PR000326-SP2 (RF-05, RF-06)
+    - **Cargo De Recepcion Osinerg** — PR000326-SP2 (RF-12)
+    - **Consulta Detalle Reclamo** — PR000326-SP2 (RF-06)
+    - **Mantenedor Gestión Reclamo** — PR000326-SP2 (RF-01)
+    - **Mis Reclamos** — PR000326-SP2 (RF-01)
+    - **Reasignación De Reclamos** — PR000326-SP2 (RF-03, RF-06, RF-09)
+  - **Reincorporacion De Clientes Retirados** — PR000349-SP10 (RF-05)
+  - **Restaura Y Transfiere A Proceso** — PR000349-SP7 (RF-04)
+  - **Resumen De Afiliacion** — PR000349-SP7 (RF-08)
+  - **Seleccion De Clientes Afectos A Corte** — PR000349-SP4 (RF-01)
+  - **Traslado De Clientes** — PR000349-SP1 (RF-01, RF-03)
+- Interno
+  - **Actualización De Agenda De Facturación** — PR000325-SP3 (RF-10)
+  - **Actualización De Agenda De Pagos** — PR000325-SP3 (RF-03)
+  - **Actualización De Conceptos** — PR000325-SP3 (RF-05)
+  - **Actualización De Documentos** — PR000325-SP3 (RF-04)
+  - **Actualización De Oficinas De La Cia** — PR000325-SP4 (RF-01, RF-03, RF-05, RF-06, RF-07, RF-08, RF-11)
+  - **Actualización De Precios** — PR000325-SP3 (RF-06)
+  - **Actualización De Tasas De Interés** — PR000325-SP3 (RF-07)
+  - **Mantenedor De Tablas Del Sistema Comercial** — PR000325-SP3 (RF-01)
+  - Plataforma Web
+    - **Consulta De Lecturas De Maxímetro** — PR000325-SP7 (RF-04)
+    - **Corrección De Demandas Leídas Históricas** — PR000325-SP7 (RF-02)
+    - **Corrección De Lecturas De Facturación** — PR000325-SP7 (RF-05)
+    - **Corrección De Lecturas Maxímetros** — PR000325-SP7 (RF-03)
+    - **Corrección De Lecturas Ordinarias** — PR000325-SP7 (RF-01)
+  - **Relación Sucursal - Sector - Zona** — PR000325-SP3 (RF-02)
+- Tecnico
+  - **Bloqueo De Reconexion** — PR000349-SP10 (RF-02)
+
+---
+
+## Posibles pantallas sin fila en el Excel (best-effort, revisar a mano)
+
+Encontradas en `_framework/modulos/*.py` pero su nombre de pantalla no aparece en ninguna fila del Excel - puede ser una variacion de redaccion, no necesariamente una omision real:
+
+- `actualizacion_agenda_facturacion.py` → Interno > Actualización De Agenda De Facturación Manual de usuario real disponible (si el proyecto lo tiene en Documentos/): manual_usuario_agenda_facturacion.pdf - documenta mensajes exactos, reglas de calculo de vencimientos y las 3 sub-pantallas
+- `actualizacion_formas_medida.py` → Interno > Actualización De Formas De Medida Selector de pantalla confirmado en vivo: text=Actualización de Formas de Medida
+- `adsoltra.py` → Comercial > Administrador De Solicitudes De Trabajo
+- `asignacion_libros_contratistas.py` → Interno > Asignación De Libros A Contratistas
+- `bloqueo_reposicion.py` → Tecnico > Bloqueo De Reconexion (OJO:
+- `cargos_reposicion_conexion.py` → Interno > Cargos De Reposición De Conexión Selector de pantalla confirmado en vivo: text=Cargos de Reposición de Conexión
+- `consulta_cortes_reconexiones.py` → Comercial > Consulta De Cortes Y Reconexiones
+- `consulta_pagos.py` → Comercial > Consulta De Pagos
+- `consulta_solicitudes_reposicion_pendientes.py` → Comercial > Consulta De Solicitudes De Reposicion Pendientes
+- `mantenedor_contratistas.py` → Comercial > Facturación > Facturación > Mantenedor De Contratistas
+- `mantenedor_presupuesto_ventas.py` → Interno > Mantenedor De Presupuesto De Ventas
+- `mantenimiento_orden_conexion.py` → Comercial > Mantenimiento De Ordenes De Conexion
+- `seguimiento_clientes_mt.py` → Comercial > Atención Integral Al Cliente > Seguimiento De Clientes Mt (item HOJA directo, un solo popup por click - a diferencia de PR000335-SP2, no hace falta abrir "Atenciones A Clientes" primero ni el _abrir_popup_por_titulo custom;

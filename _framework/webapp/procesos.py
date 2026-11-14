@@ -45,6 +45,28 @@ def proyecto_dir(proyecto: str) -> Path:
     return RAIZ / proyecto
 
 
+def _generar_reporte_preliminar(pdir: Path) -> None:
+    """Corre generar_reporte_excel.py apenas hay matriz_casos.json, sin
+    esperar a que se ejecute ningun caso - todo CP que no aparezca en
+    ningun reporte_*.csv queda como "SIN CORRER", y Nombre/Ventana por
+    RF salen de rf_nombres.json si ya existe (vacios si todavia no).
+    Pensado para que la pestana Reporte de la webapp tenga algo que
+    mostrar apenas se carga el Excel, en vez de un 404 hasta la primera
+    corrida real. Best-effort: una falla aca NO debe tumbar el flujo
+    que la llama (bootstrap/exploracion siguen siendo el resultado
+    principal), solo se deja constancia en el log del proyecto."""
+    try:
+        shutil.copy2(FRAMEWORK_DIR / "generar_reporte_excel.py", pdir / "generar_reporte_excel.py")
+        rc = _correr_subprocess_lineas(
+            [str(PYTHON), "-u", str(pdir / "generar_reporte_excel.py")], cwd=pdir,
+            on_linea=lambda l: estado.agregar_log(pdir, l),
+        )
+        if rc != 0:
+            estado.agregar_log(pdir, f"[aviso] reporte preliminar: generar_reporte_excel.py termino con codigo {rc}")
+    except Exception as e:  # noqa: BLE001
+        estado.agregar_log(pdir, f"[aviso] no se pudo generar el reporte preliminar: {e}")
+
+
 def _registrar_hilo(proyecto: str, hilo: threading.Thread) -> None:
     with _LOCK:
         activo = _PROCESOS_ACTIVOS.get(proyecto)
@@ -159,6 +181,8 @@ def _bootstrap(
     if proyecto_base:
         _copiar_de_proyecto_base(proyecto, proyecto_base, pdir)
 
+    _generar_reporte_preliminar(pdir)
+
     estado.actualizar(pdir, fase="bootstrap_ok", mensaje="Bootstrap completo. matriz_casos.json generado. Revisa la carga y, cuando quieras, dispara la exploracion con IA aparte.")
 
 
@@ -269,6 +293,12 @@ def _explorar(proyecto: str) -> None:
             pass
 
     resultado_final = {"casos_generados": n_generados, "casos_total": n_total, "casos_pendientes_revision": n_pendientes}
+
+    # Best-effort: si la exploracion escribio/actualizo rf_nombres.json,
+    # el reporte preliminar se refresca con el Nombre/Ventana reales -
+    # sigue "SIN CORRER" en todos los CP (ningun caso corrio todavia).
+    _generar_reporte_preliminar(pdir)
+
     if rc != 0:
         estado.actualizar(pdir, fase="exploracion_error", mensaje=f"claude -p termino con codigo {rc}", resultado_final=resultado_final)
     else:
