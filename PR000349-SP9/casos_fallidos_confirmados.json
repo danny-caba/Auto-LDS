@@ -11,19 +11,16 @@
     "motivo": "RESUELTO 13/11/2026 - mismo fix que CP039 (ver esa entrada). CP040 reescrito (seleccionar_semestre_consulta para cambiar a 2008- S1 y confirmar que el combo/Descripcion reflejan el cambio, sin el aviso de semestre fijado) y corrido via run_all.py: OK real.",
     "fecha_verificacion": "2026-11-13"
   },
-  "CP033": {
-    "motivo": "BLOQUEADO (falta insumo, no es un hallazgo de comportamiento) - la precondicion requiere un archivo Excel real de medidores con filas incompletas. Los fixtures que cita la matriz (scripts_qa_specialist/Sprint 9/arnes/video/fixtures/input_rf05_cp033_incompletas.xlsx y su generador) no existen en esta maquina, y el formato de columnas esperado (cliente/medidor/marca segun RN-34 del ET, pero sin layout exacto documentado - el propio ET lo marca como 'Supuesto a ratificar') no esta especificado en ningun documento disponible. Construir un archivo a ciegas arriesga reportar un rechazo de FORMATO como si fuera el comportamiento de negocio esperado (deteccion de filas incompletas). Usuario decidio documentar como bloqueado en vez de adivinar.",
-    "fecha_verificacion": "2026-11-11",
-    "evidencia": "Busqueda de los fixtures referenciados y de la especificacion de columnas en documentos/ET_texto.txt (seccion 4.5, RN-33/RN-34) sin resultado concluyente."
+  "_CP033_resuelto": {
+    "motivo": "RESUELTO 12/11/2026 (esta entrada estaba desactualizada - seguia marcada BLOQUEADO del 11/11 aunque el caso ya corria OK desde el dia siguiente). El fixture input_rf05_cp033_incompletas.xlsx se construyo y valido en vivo: carga, 'Validar...' muestra el aviso real 'Se detectaron filas incompletas en el archivo. ¿Desea eliminarlas y obtener el archivo corregido?'. CP033 OK confirmado (ver reportes/reporte_consolidado_20261113_110124.json).",
+    "fecha_verificacion": "2026-11-12"
   },
-  "CP034": {
-    "motivo": "BLOQUEADO - mismo motivo que CP033 (ver ese caso): falta el archivo Excel fixture con el medidor de marca equivalente Osinerg. El catalogo osi_medid_marca_eq SI esta confirmado identico a la matriz (FER->FRT, AB0->OTR, etc., ver _exploracion/explore de este sprint), pero sin el layout de columnas del Excel no se puede construir el archivo de entrada con confianza.",
-    "fecha_verificacion": "2026-11-11",
-    "evidencia": "Catalogo osi_medid_marca_eq confirmado en vivo (dbtecnica); fixture de entrada no disponible."
+  "_CP034_resuelto": {
+    "motivo": "RESUELTO 12/11/2026 (misma desactualizacion que CP033 - ver esa entrada). El fixture input_rf05_cp034_equivalente.xlsx se construyo y valido en vivo: los medidores con marca no exacta (FRT->FRT) y comodin (OTR) validan OK segun el catalogo osi_medid_marca_eq. CP034 OK confirmado (ver reportes/reporte_consolidado_20261113_110124.json).",
+    "fecha_verificacion": "2026-11-12"
   },
-  "CP035": {
-    "motivo": "BLOQUEADO - ESPERANDO DATO DE PRUEBA (13/11/2026: el usuario va a conseguir el query para buscar data real que habilite el caso). Mismo motivo raiz que CP033/CP034 (archivo fixture no disponible), confirmado en vivo con la precondicion YA aplicada (proceso_realizado='S' en mm_ruta_optima_cab, cod_proceso_ruta=00026, semestre 2018-S1): el boton 'Procesar...' esta habilitado sin haber validado ningun archivo en la sesion y SI muestra un dialogo de confirmacion ('Se eliminarán todos los medidores seleccionados del semestre 2018- S1 y se cargará una nueva base. ¿Desea continuar?'), pero al aceptar ese dialogo NO se dispara ninguna llamada al backend (0 responses /api/ capturadas) ni aparece el segundo dialogo especifico de 'ya existe una ruta óptima' que describe la matriz - el flujo real necesita datos de un archivo validado exitosamente (Validar...) antes de que Procesar tenga algo que enviar al servidor. Precondicion de BD revertida limpiamente (proceso_realizado vuelto a 'N', verificado).",
-    "fecha_verificacion": "2026-11-13",
-    "evidencia": "_exploracion/explore_78_cp035_procesar.py, _exploracion/explore_79_cp035_procesar2.py (0 capturas /api/ tras aceptar el dialogo, confirmado con listener de response)."
+  "_CP035_resuelto": {
+    "motivo": "RESUELTO 13/11/2026 tras varias iteraciones: (1) el semestre original de la matriz (2007-S1) y el que mando el desarrollador por error de tipeo (2013-S1, confundido con 2007-S1) ya NO estaban en el estado seguro/reversible requerido (config_conforme='S' con datos reales grandes en ambos) - se eligio en su lugar 2025-S1 (limpio: proceso_realizado='N', config_conforme='N', detalle=0), precondicionado con UPDATE mm_ruta_optima_cab SET proceso_realizado='S' WHERE empresa='7' AND cod_proceso_ruta='00039'. (2) Confirmado en vivo que 'Procesar' NO necesita ningun archivo cargado (al contrario de lo que asumia la matriz/intento anterior con cod_proceso_ruta=00026) - solo reprocesa los medidores ya asociados al semestre. (3) El mensaje real de confirmacion en Pruebas difiere del de Desarrollo (video de referencia del desarrollador, ambiente dldsweb): Pruebas lanza un proceso ASINCRONO ('Se lanzará en el servidor...' / 'El proceso fue lanzado exitosamente.') que no completa de inmediato, mientras Desarrollo termina sincronico ('Base semestral procesada'). Se grabo un video comparativo (documentos/CP005-validar.webm) y se lo paso al desarrollador, quien confirmo que el caso esta bien asi. CP035 OK confirmado con video+Word (ver CP035/CP035_evidencia.docx, CP035/CP035_video.webm).",
+    "fecha_verificacion": "2026-11-13"
   }
 }

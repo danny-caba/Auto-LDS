@@ -1239,31 +1239,34 @@ def consultar_cobranza_externa(app, frame, codigo_encargo, oficina, operador_fec
 # medidores previos".
 #
 # ### RF-06 - Consulta de Base Semestral (Consulta Y Extraccion De Base Semestral)
-# Dos caminos de entrada reales, confirmados en vivo 11/11/2026:
+# Dos caminos de entrada reales:
 # 1. **Desde "Detalles..." de RF-05** (boton en la pantalla de
 #    Importacion): abre un popup SIN iframe (`#aplicacion` no existe -
 #    el contenido carga directo en el body del popup) con el semestre ya
 #    FIJADO (no editable) - mensaje real: 'Semestre fijado al abrir esta
 #    consulta desde "Detalles..." de la Importación de Base Semestral:
-#    para cambiarlo, selecciónelo en esa pantalla.' Esta via SI
-#    funciona en automatizacion headless.
+#    para cambiarlo, selecciónelo en esa pantalla.'
 # 2. **Por el recurso de menu propio** ("Consulta Y Extraccion De Base
-#    Semestral", bajo Comercial): BLOQUEADO en automatizacion headless -
-#    el menu abre una pagina legacy jQuery (title "Consulta Y Extraccion
-#    De Base Semestral", div#contenedor vacio) que arma una URL firmada
-#    con un token encriptado (`info`) y debería redirigir/inyectar un
-#    iframe ahi dentro, pero ese paso nunca completa en Playwright
-#    headless (confirmado: 8s+ de espera adicional, `#contenedor` sigue
-#    vacio, 0 iframes) - posible limitacion especifica de SSO/popup
-#    legacy en headless, no necesariamente un defecto del producto; CP040
-#    (que depende especificamente de esta entrada por tener el semestre
-#    editable) queda bloqueado hasta investigar mas o probar sin headless.
+#    Semestral", bajo Comercial): CORREGIDO por desarrollo 13/11/2026.
+#    Hasta esa fecha estaba roto: el recurso de menu MMEXTRAE llamaba a
+#    una URL con la carpeta de app equivocada (`.../medid/medid/
+#    basesemcons/web/home//LanzarAplicativoDebug/`, 404 real del backend
+#    -confirmado con bypass de CORS via route.fetch()+fulfill(), no era
+#    un problema de headless ni de rol- la carpeta real desplegada
+#    siempre fue `extracsemes`, no `basesemcons`). Confirmado en vivo
+#    13/11/2026 tras el fix: LanzarAplicativoDebug y el endpoint
+#    obtener-semestres-contraste responden 200, el iframe #aplicacion
+#    SI aparece, y el combo #consultaSemestre llega SIN el aviso de
+#    semestre fijado, editable (no disabled), posicionado en el primer
+#    semestre del catalogo.
 #
-# Campos reales (pantalla de RF-06, confirmados via la entrada de
-# Detalles): #semestre? (texto fijado, sin id confirmado aun), combos de
-# Fase/Tipo de Contraste/Opcion de Filtro, campo Ruta + Archivo (modo
-# Excel), botones "Exportar a Excel"/"Exportar a Archivo de Texto",
-# "Extraer...", "Cancelar".
+# Campos reales (pantalla de RF-06, confirmados por esta via 13/11/2026):
+# #consultaSemestre (nz-select, igual de virtualizado que #codigoSemestre
+# de RF-05 - ver seleccionar_semestre_consulta), #consultaDescripcion
+# (solo lectura), #consultaFase, #consultaTipoContraste (nz-select),
+# radios de Opcion de Filtro, #consultaRuta + "Seleccionar carpeta..."
+# (modo Excel), #consultaNombreArchivo, radios Excel/Texto, botones
+# "Extraer...", "Cancelar", "Ayuda".
 #
 
 
@@ -1271,6 +1274,39 @@ def abrir_base_semestral(page, paso_excel=None):
     """Navega Aplicaciones > Comercial > 'Base Semestral De Medidores'
     (RF-05) y devuelve (app, frame)."""
     return abrir_aplicacion(page, ["Comercial", "Base Semestral De Medidores"], "app-importacion-basesemestral", paso_excel=paso_excel)
+
+
+def abrir_consulta_base_semestral_directo(page, paso_excel=None):
+    """Navega Aplicaciones > Comercial > 'Consulta Y Extraccion De Base
+    Semestral' (RF-06, entrada directa por el recurso de menu MMEXTRAE,
+    SIN pasar por RF-05/Detalles) y devuelve (app, frame) con el
+    combo de Semestre editable (sin fijar). Requiere el fix de
+    desarrollo del 13/11/2026 (ver ficha tecnica arriba) - antes de esa
+    fecha esta entrada daba 404 real."""
+    return abrir_aplicacion(page, ["Comercial", "Consulta Y Extraccion De Base Semestral"], "#consultaSemestre", paso_excel=paso_excel)
+
+
+def seleccionar_semestre_consulta(app, frame, anno_sem_texto, max_scrolls=40, paso_scroll=150):
+    """Igual que seleccionar_semestre() pero para el combo #consultaSemestre
+    de RF-06 (entrada directa) - mismo patron virtualizado."""
+    frame.locator("#consultaSemestre").click(force=True)
+    app.wait_for_timeout(1000)
+    opcion = frame.locator("nz-option-item", has_text=anno_sem_texto)
+    if opcion.count():
+        opcion.first.click(force=True)
+        app.wait_for_timeout(1500)
+        return
+    viewport = frame.locator("cdk-virtual-scroll-viewport")
+    viewport.first.evaluate("el => el.scrollTop = 0")
+    app.wait_for_timeout(300)
+    for _ in range(max_scrolls):
+        if opcion.count():
+            break
+        viewport.first.evaluate(f"el => el.scrollTop += {paso_scroll}")
+        app.wait_for_timeout(250)
+    assert opcion.count(), f"No se encontro el semestre {anno_sem_texto!r} en el combo (ni visible ni tras scroll)"
+    opcion.first.click(force=True)
+    app.wait_for_timeout(1500)
 
 
 def seleccionar_semestre(app, frame, anno_sem_texto, max_scrolls=40, paso_scroll=150):
@@ -1523,7 +1559,42 @@ def main():
         _CASO_OK = False
         try:
             login(page, paso_excel=1)
-            raise NotImplementedError('CP035 (RF-05 - Procesar con ruta óptima previa existente): falta escribir el body real - falta exploracion en vivo o dato real.')
+            app, frame = abrir_base_semestral(page, paso_excel=1)
+            seleccionar_semestre(app, frame, "2025- S1")
+            app.wait_for_timeout(2000)
+            texto_pantalla = frame.locator("body").inner_text()
+            assert "ya tiene medidores asociados" in texto_pantalla, f"Se esperaba el aviso de medidores ya asignados (ruta optima previa): {texto_pantalla[:400]!r}"
+            radios = frame.locator("input[type='radio']")
+            assert radios.nth(0).is_disabled(), "La opcion 'Cargar nueva base' deberia quedar deshabilitada (ruta optima previa existente)"
+            assert radios.nth(1).is_checked(), "La opcion 'Eliminar...' deberia quedar fijada/marcada"
+            capturar_paso(app, "semestre_con_ruta_optima_previa", paso_excel=2)
+
+            # No hace falta cargar ningun archivo - "Procesar" reprocesa los medidores
+            # YA asociados al semestre (confirmado en vivo 13/11/2026 comparando con
+            # un video de referencia del desarrollador en Desarrollo).
+            boton_procesar = frame.locator("button", has_text="Procesar").first
+            assert boton_procesar.is_enabled(), "Procesar deberia estar habilitado sin necesidad de cargar un archivo"
+            boton_procesar.click()
+            app.wait_for_timeout(2000)
+            texto_confirmacion = frame.locator("body").inner_text()
+            assert "¿Desea continuar?" in texto_confirmacion, f"Se esperaba el dialogo de confirmacion de Procesar: {texto_confirmacion[-400:]!r}"
+            capturar_paso(app, "dialogo_confirmacion_procesar", paso_excel=3)
+
+            frame.get_by_role("button", name=re.compile("^Aceptar$", re.I)).last.click()
+            app.wait_for_timeout(2000)
+            texto_lanzado = frame.locator("body").inner_text()
+            assert "El proceso fue lanzado exitosamente" in texto_lanzado, f"Se esperaba el aviso de lanzamiento exitoso: {texto_lanzado[-400:]!r}"
+            capturar_paso(app, "proceso_lanzado_exitosamente", paso_excel=3)
+
+            # Confirmado con el desarrollador (13/11/2026, video CP005-validar.webm
+            # vs su propio video de Desarrollo): en Pruebas este proceso queda
+            # asincrono ("Proceso de seleccion lanzado en el servidor.") y no
+            # completa de inmediato como en Desarrollo (que termina sincronico con
+            # "Base semestral procesada") - el lanzamiento exitoso ES el resultado
+            # esperado para este caso en este ambiente, aceptado por el desarrollador.
+            frame.get_by_role("button", name=re.compile("^Aceptar$", re.I)).last.click()
+            app.wait_for_timeout(1000)
+            capturar_paso(app, "aviso_cerrado", paso_excel=4)
 
             capturar_paso(app, "estado_final_del_caso", paso_excel=max(_parsear_pasos_excel(PASOS_CASO), default=None))
             _CASO_OK = True

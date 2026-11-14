@@ -1022,6 +1022,45 @@ assert radios.nth(1).is_checked(), "La opcion 'Eliminar...' deberia quedar fijad
 capturar_paso(app, "semestre_con_medidores_asignados_opcion_fijada", paso_excel=2)
 '''
 
+CUERPOS_REALES["CP035"] = '''
+app, frame = abrir_base_semestral(page, paso_excel=1)
+seleccionar_semestre(app, frame, "2025- S1")
+app.wait_for_timeout(2000)
+texto_pantalla = frame.locator("body").inner_text()
+assert "ya tiene medidores asociados" in texto_pantalla, f"Se esperaba el aviso de medidores ya asignados (ruta optima previa): {texto_pantalla[:400]!r}"
+radios = frame.locator("input[type='radio']")
+assert radios.nth(0).is_disabled(), "La opcion 'Cargar nueva base' deberia quedar deshabilitada (ruta optima previa existente)"
+assert radios.nth(1).is_checked(), "La opcion 'Eliminar...' deberia quedar fijada/marcada"
+capturar_paso(app, "semestre_con_ruta_optima_previa", paso_excel=2)
+
+# No hace falta cargar ningun archivo - "Procesar" reprocesa los medidores
+# YA asociados al semestre (confirmado en vivo 13/11/2026 comparando con
+# un video de referencia del desarrollador en Desarrollo).
+boton_procesar = frame.locator("button", has_text="Procesar").first
+assert boton_procesar.is_enabled(), "Procesar deberia estar habilitado sin necesidad de cargar un archivo"
+boton_procesar.click()
+app.wait_for_timeout(2000)
+texto_confirmacion = frame.locator("body").inner_text()
+assert "¿Desea continuar?" in texto_confirmacion, f"Se esperaba el dialogo de confirmacion de Procesar: {texto_confirmacion[-400:]!r}"
+capturar_paso(app, "dialogo_confirmacion_procesar", paso_excel=3)
+
+frame.get_by_role("button", name=re.compile("^Aceptar$", re.I)).last.click()
+app.wait_for_timeout(2000)
+texto_lanzado = frame.locator("body").inner_text()
+assert "El proceso fue lanzado exitosamente" in texto_lanzado, f"Se esperaba el aviso de lanzamiento exitoso: {texto_lanzado[-400:]!r}"
+capturar_paso(app, "proceso_lanzado_exitosamente", paso_excel=3)
+
+# Confirmado con el desarrollador (13/11/2026, video CP005-validar.webm
+# vs su propio video de Desarrollo): en Pruebas este proceso queda
+# asincrono ("Proceso de seleccion lanzado en el servidor.") y no
+# completa de inmediato como en Desarrollo (que termina sincronico con
+# "Base semestral procesada") - el lanzamiento exitoso ES el resultado
+# esperado para este caso en este ambiente, aceptado por el desarrollador.
+frame.get_by_role("button", name=re.compile("^Aceptar$", re.I)).last.click()
+app.wait_for_timeout(1000)
+capturar_paso(app, "aviso_cerrado", paso_excel=4)
+'''
+
 CUERPOS_REALES["CP036"] = '''
 app, frame = abrir_base_semestral(page, paso_excel=1)
 seleccionar_semestre(app, frame, "2004- S1")
